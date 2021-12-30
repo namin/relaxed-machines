@@ -5,3 +5,4 @@ Next steps (TODOs)
 - [ ] Flesh out a machine with a proper stack and more instructions.
 - [ ] Define sketches.
 - [ ] Make the machine code symbolic at the end.
+- [ ] Write proper tests.
