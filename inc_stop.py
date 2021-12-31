@@ -12,7 +12,7 @@ The learning task is to learn counting (modulo n) by incrementing d times.
 For n=5 and  d=3, we generate the examples
 f(0) = 3, f(1) = 4, f(2) = 0, f(3) = 1, f(4) = 2
 and the machine learns the program
-INC, INC, INC, STOP, ...garbage...
+INC, INC, INC, STOP, *
 """
 
 from typing import Any, NamedTuple, Optional
