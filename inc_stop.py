@@ -1,5 +1,5 @@
 """A differentiable machine that only understands `INC` and `STOP`,
-and optionally `NOP`.
+and optionally `NOP` and `DEC`.
 
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
@@ -41,6 +41,7 @@ import optax
 import itertools
 
 NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is available as an instruction')
+DEC = flags.DEFINE_boolean('dec', False, 'whether DEC is available as an instruction')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
@@ -50,6 +51,8 @@ SEED = flags.DEFINE_integer('seed', 42, '')
 
 def instruction_names():
     names = ['STOP', 'INC']
+    if DEC.value:
+        names.append('DEC')
     if NOP.value:
         names.append('NOP')
     return names
@@ -62,6 +65,7 @@ class Machine(hk.RNNCore):
         super().__init__(name=name)
         self.n = N.value
         self.has_nop = NOP.value
+        self.has_dec = DEC.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.identity(self.n)
         a0 = self.inc_matrix[0]
@@ -70,6 +74,14 @@ class Machine(hk.RNNCore):
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
         self.data_instructions = [self.stop_matrix, self.inc_matrix]
         self.pc_instructions = [self.stop_matrix, self.inc_matrix]
+        if self.has_dec:
+            self.dec_matrix =  jnp.identity(self.n)
+            an = self.dec_matrix[-1]
+            for i in range(1, self.n):
+                self.dec_matrix = self.dec_matrix.at[i].set(self.dec_matrix[i+1])
+            self.dec_matrix = self.dec_matrix.at[0].set(an)
+            self.data_instructions.append(self.dec_matrix)
+            self.pc_instructions.append(self.inc_matrix)
         if self.has_nop:
             self.data_instructions.append(self.stop_matrix)
             self.pc_instructions.append(self.inc_matrix)
@@ -111,7 +123,7 @@ class Machine(hk.RNNCore):
         return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
-        code = jnp.array([[1.0 if (i==0 and (not self.has_nop or l==self.n-1)) or (i==2 and (self.has_nop and l!=self.n-1)) else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        code = jnp.array([[1.0 if (i==0 and (not self.has_nop or l==self.n-1)) or (i==self.ni-1 and (self.has_nop and l!=self.n-1)) else 0.0 for i in range(self.ni)] for l in range(self.n)])
         def code_fun(shape, dtype):
             return code
         return code_fun
