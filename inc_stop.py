@@ -51,18 +51,19 @@ class Machine(hk.RNNCore):
     ):
         super().__init__(name=name)
         self.n = N.value
+        self.has_nop = NOP.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.identity(self.n)
         a0 = self.inc_matrix[0]
         for i in range(self.n-1):
             self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
-        instructions = [self.stop_matrix, self.inc_matrix]
-        if NOP.value:
-            instructions.append(self.stop_matrix)
-        self.ni = len(instructions)
-        self.data_instructions = instructions
-        self.pc_instructions = instructions
+        self.data_instructions = [self.stop_matrix, self.inc_matrix]
+        self.pc_instructions = [self.stop_matrix, self.inc_matrix]
+        if self.has_nop:
+            self.data_instructions.append(self.stop_matrix)
+            self.pc_instructions.append(self.inc_matrix)
+        self.ni = len(self.data_instructions)
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
@@ -100,7 +101,7 @@ class Machine(hk.RNNCore):
         return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
-        code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        code = jnp.array([[1.0 if (i==0 and (not self.has_nop or l==self.n-1)) or (i==2 and (self.has_nop and l!=self.n-1)) else 0.0 for i in range(self.ni)] for l in range(self.n)])
         def code_fun(shape, dtype):
             return code
         return code_fun
