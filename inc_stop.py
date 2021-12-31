@@ -92,7 +92,8 @@ class Machine(hk.RNNCore):
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
         new_data = new_state[0:self.n]
-        return new_data, new_state
+        new_halted = new_state[2*self.n:2*self.n+2]
+        return (new_data, new_halted), new_state
 
     def initial_state(self, batch_size: Optional[int]):
         data = jnp.zeros([self.n]).at[0].set(1)
@@ -151,17 +152,19 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  logits, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
-  return logits
+  (logits, halted), _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
+  return (logits, halted)
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   # Note: this function is impure; we hk.transform() it below.
   # the [-1] is to consider only the final output, not the intermediary data points
-  logits = forward(t['input'])[-1]
-  log_probs = jax.nn.log_softmax(logits)
+  (logits, halted) = forward(t['input'])
+  log_probs = jax.nn.log_softmax(logits[-1])
+  log_probs_halted = jax.nn.log_softmax(halted[-1])
+
   one_hot_labels = t['target'][-1]
-  loss = -jnp.sum(one_hot_labels * log_probs)
+  loss = -jnp.sum(one_hot_labels * log_probs) + log_probs_halted[0]
   return loss
 
 @jax.jit
