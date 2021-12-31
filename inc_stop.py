@@ -3,10 +3,7 @@
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
 
-We're using an RNN, where the output is the data point (top of the 'stack').
-For an example computation, we have to provide the data point at each step.
-
-The code parameterizes the neural network. The weights represent the
+The code parameterizes the neural network. The parameters represent the
 code, and we learn the code.
 
 We initialize the code with all STOPs.
@@ -31,7 +28,7 @@ N = flags.DEFINE_integer('n', 5, 'uniform number: of integers, of lines of code,
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
-TRAINING_STEPS = flags.DEFINE_integer('training_steps', 1000, '')
+TRAINING_STEPS = flags.DEFINE_integer('training_steps', 10000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 class Machine(hk.RNNCore):
@@ -48,11 +45,11 @@ class Machine(hk.RNNCore):
             self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
         unique_instructions = [self.stop_matrix, self.inc_matrix]
-        n_unique = len(unique_instructions)
-        assert self.n >= n_unique
+        self.ni = len(unique_instructions)
+        assert self.n >= self.ni
         instructions = []
         for i in range(self.n):
-            instructions.append(unique_instructions[i%n_unique])
+            instructions.append(unique_instructions[i%self.ni])
         self.data_instructions = instructions
         self.pc_instructions = instructions
 
@@ -64,7 +61,8 @@ class Machine(hk.RNNCore):
     def initial_state(self, batch_size: Optional[int]):
         data = jnp.zeros([self.n]).at[0].set(1)
         pc = jnp.zeros([self.n]).at[0].set(1)
-        state = jnp.concatenate((data, pc))
+        halted = jnp.array([0, 1])
+        state = jnp.concatenate((data, pc, halted))
         assert batch_size is None
         return state
 
@@ -72,6 +70,7 @@ class Machine(hk.RNNCore):
         code = self.get_code()
         data = jax.nn.softmax(SOFTMAX_SHARP.value*state[0:self.n])
         pc = jax.nn.softmax(SOFTMAX_SHARP.value*state[self.n:2*self.n])
+        halted = jax.nn.softmax(SOFTMAX_SHARP.value*state[2*self.n:2*self.n+2])
         sel = jnp.zeros(self.n)
         for i in range(self.n):
             sel += pc[i] * jax.nn.softmax(SOFTMAX_SHARP.value*code[i])
@@ -80,9 +79,13 @@ class Machine(hk.RNNCore):
         for i in range(self.n):
             data_instr += sel[i] * self.data_instructions[i]
             pc_instr += sel[i] * self.pc_instructions[i]
-        next_data = jnp.matmul(data, data_instr)
-        next_pc = jnp.matmul(pc, pc_instr)
-        next_state = jnp.concatenate((next_data, next_pc))
+        next_data = halted[0] * data + halted[1] * jnp.matmul(data, data_instr)
+        next_pc = halted[0] * pc + halted[1] * jnp.matmul(pc, pc_instr)
+        instrs = jnp.zeros(self.ni)
+        for i in range(self.n):
+            instrs += instrs.at[i%self.ni].set(sel[i])
+        next_halted = jnp.array([halted[0] + halted[1]*instrs[0], halted[1]*instrs[1]])
+        next_state = jnp.concatenate((next_data, next_pc, next_halted))
         return next_state
 
     def get_code(self):
@@ -121,11 +124,11 @@ def forward(input) -> jnp.ndarray:
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   # Note: this function is impure; we hk.transform() it below.
-  sequence_length = N.value
-  logits = forward(t['input'])
+  # the [-1] is to consider only the final output, not the intermediary data points
+  logits = forward(t['input'])[-1]
   log_probs = jax.nn.log_softmax(logits)
-  one_hot_labels = t['target']
-  loss = -jnp.sum(one_hot_labels * log_probs) / sequence_length
+  one_hot_labels = t['target'][-1]
+  loss = -jnp.sum(one_hot_labels * log_probs)
   return loss
 
 @jax.jit
