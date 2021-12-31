@@ -179,7 +179,7 @@ def main(_):
         #print('input:', t['input'])
         #print(logits)
         print('input:', jnp.argmax(t['input']).item())
-        print(to_discrete(logits))
+        print('output steps:', to_discrete(logits))
 
 if __name__ == '__main__':
     app.run(main)
