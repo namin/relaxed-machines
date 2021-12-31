@@ -7,6 +7,7 @@ Next steps (TODOs)
   - [ ] Could implement a "soft" sketch as initialization.
   - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
   - [ ] Could implement sketches like ∂4.
+- [ ] Could define the loss over an arbitrary mask of the state, not just the "top of stack".
 - [ ] Write proper tests.
 
 ## Done
