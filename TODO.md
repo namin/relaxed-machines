@@ -3,7 +3,6 @@ Next steps (TODOs)
 
 - [ ] Flesh out a machine with a proper stack and more instructions.
 - [ ] Define sketches.
-- [ ] Make the machine code symbolic at the end.
 - [ ] Write proper tests.
 
 ## Done
@@ -17,3 +16,5 @@ Next steps (TODOs)
 - [x] Perhaps, no need for number flag n to be uniform.
       Not needed for instructions, but needed otherwise
       because of the uniform way instruction matrices operate on data and pc.
+
+- [x] Make the machine code symbolic at the end.
