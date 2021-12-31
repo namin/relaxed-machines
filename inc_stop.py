@@ -30,12 +30,19 @@ import optax
 
 import itertools
 
+NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is an instruction')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
+
+def instruction_names():
+    names = ['STOP', 'INC']
+    if NOP.value:
+        names.append('NOP')
+    return names
 
 class Machine(hk.RNNCore):
     def __init__(
@@ -51,6 +58,8 @@ class Machine(hk.RNNCore):
             self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
         instructions = [self.stop_matrix, self.inc_matrix]
+        if NOP.value:
+            instructions.append(self.stop_matrix)
         self.ni = len(instructions)
         self.data_instructions = instructions
         self.pc_instructions = instructions
@@ -172,7 +181,8 @@ def main(_):
 
     #print(state.params['machine']['code'])
     print('MACHINE CODE')
-    print(to_discrete(state.params['machine']['code']))
+    names = instruction_names()
+    print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
