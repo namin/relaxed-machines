@@ -13,8 +13,6 @@ counting while stopping before the needed incrementing.
 The code parameterizes the neural network.
 The parameters represent the code, and we learn the code.
 
-We initialize the code with all STOPs.
-
 The learning task is to learn counting (modulo n) by incrementing d times,
 that is f(x)=(x+d) % n.
 For n=5 and  d=3, we generate the examples
@@ -41,6 +39,7 @@ import itertools
 NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is available as an instruction')
 INC = flags.DEFINE_boolean('inc', True, 'whether INC is available as an instruction')
 DEC = flags.DEFINE_boolean('dec', False, 'whether DEC is available as an instruction')
+INIT_NOP = flags.DEFINE_boolean('init_nop', False, 'whether to intialize with NOPs mostly as opposed to STOPs; only effective with --nop.')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
@@ -68,6 +67,7 @@ class Machine(hk.RNNCore):
         self.has_nop = NOP.value
         self.has_inc = INC.value
         self.has_dec = DEC.value
+        self.init_nop = self.has_nop and INIT_NOP.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.identity(self.n)
         a0 = self.inc_matrix[0]
@@ -125,7 +125,13 @@ class Machine(hk.RNNCore):
         return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
-        code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        if self.init_nop:
+            # all NOPs but last STOP
+            code = jnp.array([[1.0 if (i==0 and (not self.has_nop or l==self.n-1)) or (i==self.ni-1 and (self.has_nop and l!=self.n-1)) else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        else:
+            # all STOPs
+            code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.ni)] for l in range(self.n)])
+
         def code_fun(shape, dtype):
             return code
         return code_fun
