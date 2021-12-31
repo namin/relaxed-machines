@@ -78,7 +78,7 @@ class Machine(hk.RNNCore):
             self.dec_matrix =  jnp.identity(self.n)
             an = self.dec_matrix[-1]
             for i in range(1, self.n):
-                self.dec_matrix = self.dec_matrix.at[i].set(self.dec_matrix[i+1])
+                self.dec_matrix = self.dec_matrix.at[i].set(self.dec_matrix[i-1])
             self.dec_matrix = self.dec_matrix.at[0].set(an)
             self.data_instructions.append(self.dec_matrix)
             self.pc_instructions.append(self.inc_matrix)
