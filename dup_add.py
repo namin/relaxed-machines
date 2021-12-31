@@ -85,8 +85,7 @@ class Machine(hk.RNNCore):
             nr = self.add(n1, n2)
             next_data = self.write_value(next_data_p, data, nr)
             return (next_data_p, next_data, next_pc)
-        # NOP
-        return (data_p, data, next_pc)
+        # let an error be...
 
     def add(self, n1, n2):
         nr = jnp.zeros(self.n)
@@ -97,7 +96,7 @@ class Machine(hk.RNNCore):
         return nr
 
     def initial_state(self, batch_size: Optional[int]):
-        data_p = jnp.zeros([self.n]).at[0].set(1)
+        data_p = jnp.zeros(self.n).at[0].set(1)
         data = jnp.zeros([self.n, self.n])
         for i in range(self.n):
             data = data.at[(i,0)].set(1)
@@ -221,7 +220,7 @@ def to_discrete(a):
     return [jnp.argmax(x).item() for x in a]
 
 def main(_):
-    #flags.FLAGS([""])
+    flags.FLAGS([""])
 
     train_data = itertools.cycle(train_data_inc(D.value))
 
@@ -235,19 +234,28 @@ def main(_):
     initial_opt_state = opt_init(initial_params)
     state = TrainingState(params=initial_params, opt_state=initial_opt_state)
 
-    for step in range(TRAINING_STEPS.value + 1):
-        t = next(train_data)
-        state = update(state, t)
+    #for step in range(TRAINING_STEPS.value + 1):
+    #    t = next(train_data)
+    #    state = update(state, t)
 
-    #print(state.params['machine']['code'])
-    print('MACHINE CODE', 'for learning f(x)=(x+%d)%%%d' % (D.value, N.value))
+    code = jnp.zeros([5, 3])
+    code = code.at[(0,0)].set(1)
+    code = code.at[(1,1)].set(1)
+    code = code.at[(2,2)].set(1)
+    code = code.at[(3,2)].set(1)
+    code = code.at[(4,2)].set(1)
+
+    params = {'machine': {'code': code } }
+
+    print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
     names = instruction_names()
-    print([names[x]for x in to_discrete(state.params['machine']['code'])])
+    print([names[x]for x in to_discrete(params['machine']['code'])])
+
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        (logits, _) = forward_fn(state.params, t['input'])
+        (logits, _) = forward_fn(params, t['input'])
         #print('input:', t['input'])
         #print(logits)
         print('input:', jnp.argmax(t['input']).item())
