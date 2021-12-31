@@ -6,3 +6,4 @@ Next steps (TODOs)
 - [ ] Define sketches.
 - [ ] Make the machine code symbolic at the end.
 - [ ] Write proper tests.
+- [ ] Perhaps, no need for number flag n to be uniform.
