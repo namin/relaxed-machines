@@ -58,20 +58,31 @@ class Machine(hk.RNNCore):
         new_halted = new_state[-3:-1]
         return (new_data_value, new_halted), new_state
 
-    def read_value(self, pointer, data):
-        return jnp.matmul(pointer.T, data).T
+    def read_value(self, data_p, data):
+        return jnp.matmul(data_p.T, data).T
+
+    def write_value(self, data_p, data, data_value):
+        old = jnp.outer(data_p, jnp.ones(self.n)) * data
+        new = jnp.outer(data_p, data_value)
+        return data - old + new
 
     def is_instr(self, iname, index):
         return self.inames[index] == iname
 
     def execute_instr(self, i, data_p, data, pc):
-        # TODO
         if self.is_instr('STOP', i):
-            pass
-        elif self.is_instr('DUP', i):
+            return (data_p, data, pc)
+        next_pc = jnp.matmul(pc, self.inc_matrix)
+        if self.is_instr('DUP', i):
+            data_value = self.read_value(data_p, data)
+            next_data_p = jnp.matmul(data_p, self.inc_matrix)
+            next_data = self.write_value(next_data_p, data, data_value)
+            return (next_data_p, next_data, next_pc)
+        elif self.is_instr('ADD', i):
+            # TODO
             pass
         # NOP
-        return (data_p, data, jnp.matmul(pc,self.inc_matrix))
+        return (data_p, data, next_pc)
 
     def initial_state(self, batch_size: Optional[int]):
         data_p = jnp.zeros([self.n]).at[0].set(1)
