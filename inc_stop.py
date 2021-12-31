@@ -221,7 +221,7 @@ def main(_):
         state = update(state, t)
 
     #print(state.params['machine']['code'])
-    print('MACHINE CODE')
+    print('MACHINE CODE', 'for learning f(x)=(x+%d)%%%d' % (D.value, N.value))
     names = instruction_names()
     print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
