@@ -10,7 +10,8 @@ The parameters represent the code, and we learn the code.
 We initialize the code with all STOPs if NOP is unavailable;
 otherwise with all NOPS except a STOP at last.
 
-The learning task is to learn counting (modulo n) by incrementing d times.
+The learning task is to learn counting (modulo n) by incrementing d times,
+that is f(x)=(x+d) % n.
 For n=5 and  d=3, we generate the examples
 f(0) = 3, f(1) = 4, f(2) = 0, f(3) = 1, f(4) = 2
 and the machine learns the program
