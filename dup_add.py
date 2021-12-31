@@ -46,6 +46,7 @@ class Machine(hk.RNNCore):
         self.n = N.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
+        self.dec_matrix = jnp.transpose(self.inc_matrix)
         self.inames = instruction_names()
         self.ni = len(self.inames)
 
@@ -79,10 +80,22 @@ class Machine(hk.RNNCore):
             next_data = self.write_value(next_data_p, data, data_value)
             return (next_data_p, next_data, next_pc)
         elif self.is_instr('ADD', i):
-            # TODO
-            pass
+            n1 = self.read_value(data_p, data)
+            next_data_p = jnp.matmul(data_p, self.dec_matrix)
+            n2 = self.read_value(next_data_p, data)
+            nr = self.add(n1, n2)
+            next_data = self.write_value(next_data_p, data, nr)
+            return (next_data_p, next_data, next_pc)
         # NOP
         return (data_p, data, next_pc)
+
+    def add(self, n1, n2):
+        nr = jnp.zeros(self.n)
+        m = jnp.identity(self.n)
+        for i in range(self.n):
+            nr += n2[i] * jnp.matmul(n1, m)
+            m = jnp.matmul(m, self.inc_matrix)
+        return nr
 
     def initial_state(self, batch_size: Optional[int]):
         data_p = jnp.zeros([self.n]).at[0].set(1)
