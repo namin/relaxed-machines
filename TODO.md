@@ -5,7 +5,8 @@ Next steps (TODOs)
 - [ ] Flesh out a machine with labels and branching and subroutines.
 - [ ] Define sketches.
   - [ ] Could implement a "soft" sketch as initialization.
-  - [ ] Could implement a "hard" sketch by restricting code parameters to holes. 
+  - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
+  - [ ] Could implement sketches like ∂4.
 - [ ] Write proper tests.
 
 ## Done
