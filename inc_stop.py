@@ -1,4 +1,5 @@
-"""A differentiable machine that only understands `INC` and `STOP`.
+"""A differentiable machine that only understands `INC` and `STOP`,
+and optionally `NOP`.
 
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
@@ -6,7 +7,8 @@ There is also a program counter and a code bank.
 The code parameterizes the neural network.
 The parameters represent the code, and we learn the code.
 
-We initialize the code with all STOPs.
+We initialize the code with all STOPs if NOP is unavailable;
+otherwise with all NOPS except a STOP at last.
 
 The learning task is to learn counting (modulo n) by incrementing d times.
 For n=5 and  d=3, we generate the examples
