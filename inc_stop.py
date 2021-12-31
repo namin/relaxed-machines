@@ -117,7 +117,7 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  logits, _ = hk.dynamic_unroll(core, [jnp.zeros(5) for i in range(sequence_length)], initial_state)
+  logits, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
   return logits
 
 def sequence_loss(t) -> jnp.ndarray:
