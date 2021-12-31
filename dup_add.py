@@ -203,7 +203,7 @@ def sequence_loss(t) -> jnp.ndarray:
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits[-1])
   log_probs_halted = jax.nn.log_softmax(SOFTMAX_SHARP.value*halted[-1])
 
-  one_hot_labels = t['target'][-1]
+  one_hot_labels = t['target']
   loss = -jnp.sum(one_hot_labels * log_probs)
   loss -= log_probs_halted[0]
   return loss
@@ -222,7 +222,7 @@ def train_data_inc(d):
     r = []
     for i in range(N.value):
         data = jax.nn.one_hot(i, N.value)
-        target = jax.nn.one_hot([(i+j+1)%N.value if j < d else (i+d)%N.value for j in range(N.value)], N.value)
+        target = jax.nn.one_hot((i*d)%N.value, N.value)
         r.append({'input':data, 'target':target})
     return r
 
@@ -230,8 +230,39 @@ def to_discrete(a):
     return [jnp.argmax(x).item() for x in a]
 
 def main(_):
-    flags.FLAGS([""])
+    #flags.FLAGS([""])
 
+    train_data = itertools.cycle(train_data_inc(D.value))
+
+    params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
+    opt_init, _ = make_optimizer()
+
+    loss_fn = jax.jit(loss_fn)
+
+    rng = hk.PRNGSequence(SEED.value)
+    initial_params = params_init(next(rng), next(train_data))
+    initial_opt_state = opt_init(initial_params)
+    state = TrainingState(params=initial_params, opt_state=initial_opt_state)
+
+    for step in range(TRAINING_STEPS.value + 1):
+        t = next(train_data)
+        state = update(state, t)
+
+    #print(state.params['machine']['code'])
+    print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
+    names = instruction_names()
+    print([names[x]for x in to_discrete(state.params['machine']['code'])])
+
+    _, forward_fn = hk.without_apply_rng(hk.transform(forward))
+    for i in range(N.value):
+        t = next(train_data)
+        (logits, _) = forward_fn(state.params, t['input'])
+        #print('input:', t['input'])
+        #print(logits)
+        print('input:', jnp.argmax(t['input']).item())
+        print('output steps:', to_discrete(logits))
+
+def forward_test(_):
     train_data = itertools.cycle(train_data_inc(D.value))
 
     code = jnp.zeros([5, 3])
@@ -246,7 +277,6 @@ def main(_):
     print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
     names = instruction_names()
     print([names[x]for x in to_discrete(params['machine']['code'])])
-
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
