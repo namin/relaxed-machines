@@ -118,7 +118,7 @@ class Machine(hk.RNNCore):
             pc_instr += sel[i] * self.pc_instructions[i]
         next_data = halted[0] * data + halted[1] * jnp.matmul(data, data_instr)
         next_pc = halted[0] * pc + halted[1] * jnp.matmul(pc, pc_instr)
-        next_halted = jnp.array([halted[0] + halted[1]*sel[0], halted[1]*sel[1]])
+        next_halted = jnp.array([halted[0] + halted[1]*sel[0], halted[1]*(1-sel[0])])
         next_state = jnp.concatenate((next_data, next_pc, next_halted))
         return next_state
 
