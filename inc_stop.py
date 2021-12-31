@@ -147,7 +147,7 @@ def train_data_inc(d):
     return r
 
 def main(_):
-    flags.FLAGS([""])
+    #flags.FLAGS([""])
 
     train_data = itertools.cycle(train_data_inc(D.value))
 
