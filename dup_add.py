@@ -52,11 +52,10 @@ class Machine(hk.RNNCore):
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
-        data_p = new_state[0:self.n]
-        data = new_state[self.n:self.n*self.n+self.n]
-        data = jnp.reshape(data, [self.n, self.n])
+        data_p = self.state_data_p(new_state)
+        data = self.state_data(new_state)
         new_data_value = self.read_value(data_p, data)
-        new_halted = new_state[-3:-1]
+        new_halted = self.state_halted(new_state)
         return (new_data_value, new_halted), new_state
 
     def read_value(self, data_p, data):
@@ -109,18 +108,33 @@ class Machine(hk.RNNCore):
         assert batch_size is None
         return state
 
+    def sm(self, x):
+        return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+
+    def state_data_p(self, state):
+        return state[0:self.n]
+
+    def state_data(self, state):
+        data = state[self.n:self.n*self.n+self.n]
+        return jnp.reshape(data, [self.n, self.n])
+
+    def state_pc(self, state):
+        return state[self.n*self.n+self.n:self.n*self.n+2*self.n]
+
+    def state_halted(self, state):
+        return state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2]
+
     def step(self, state):
         code = self.get_code()
-        data_p = jax.nn.softmax(SOFTMAX_SHARP.value*state[0:self.n])
-        data = state[self.n:self.n*self.n+self.n]
-        data = jnp.reshape(data, [self.n, self.n])
+        data_p = self.sm(self.state_data_p(state))
+        data = self.state_data(state)
         for i in range(self.n):
-            data = data.at[i].set(jax.nn.softmax(SOFTMAX_SHARP.value*data[i]))
-        pc = jax.nn.softmax(SOFTMAX_SHARP.value*state[self.n*self.n+self.n:self.n*self.n+2*self.n])
-        halted = jax.nn.softmax(SOFTMAX_SHARP.value*state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2])
+            data = data.at[i].set(self.sm(data[i]))
+        pc = self.sm(self.state_pc(state))
+        halted = self.sm(self.state_halted(state))
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
-            sel += pc[i] * jax.nn.softmax(SOFTMAX_SHARP.value*code[i])
+            sel += pc[i] * self.sm(code[i])
         new_data_p = jnp.zeros(self.n)
         new_data = jnp.zeros([self.n, self.n])
         new_pc = jnp.zeros(self.n)
