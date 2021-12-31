@@ -53,10 +53,10 @@ class Machine(hk.RNNCore):
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
         data_p = self.state_data_p(new_state)
-        data = self.state_data(new_state)
+        data = self.sm_data(self.state_data(new_state))
         new_data_value = self.read_value(data_p, data)
         new_halted = self.state_halted(new_state)
-        return new_state, new_state
+        return (new_data_value, new_halted), new_state
 
     def read_value(self, data_p, data):
         return jnp.matmul(data_p.T, data).T
@@ -123,12 +123,15 @@ class Machine(hk.RNNCore):
     def state_halted(self, state):
         return state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2]
 
+    def sm_data(self, data):
+        for i in range(self.n):
+            data = data.at[i].set(self.sm(data[i]))
+        return data
+
     def step(self, state):
         code = self.get_code()
         data_p = self.sm(self.state_data_p(state))
-        data = self.state_data(state)
-        for i in range(self.n):
-            data = data.at[i].set(self.sm(data[i]))
+        data = self.sm_data(self.state_data(state))
         pc = self.sm(self.state_pc(state))
         halted = self.sm(self.state_halted(state))
         sel = jnp.zeros(self.ni)
@@ -190,8 +193,8 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
-  return states
+  (logits, halted), _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
+  return (logits, halted)
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
@@ -248,10 +251,10 @@ def main(_):
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        outputs = forward_fn(params, t['input'])
+        logits, _ = forward_fn(params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
-        #print('output steps:', to_discrete(logits))
-        print('outputs:', outputs)
+        print('output steps:', to_discrete(logits))
+        #print('outputs:', outputs)
 
 if __name__ == '__main__':
     app.run(main)
