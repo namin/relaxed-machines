@@ -1,6 +1,7 @@
 Next steps (TODOs)
 ----------
 
+- [ ] The to_discreet function needs to take into account all the positions that could be one instruction.
 - [ ] Avoid the RNN artifact of having to specify all the intermediate data points.
       Need to encode that any instruction after stop is ignored.
 - [ ] Flesh out a machine with a proper stack and more instructions.
