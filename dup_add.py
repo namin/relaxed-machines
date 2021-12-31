@@ -46,7 +46,7 @@ class Machine(hk.RNNCore):
         self.n = N.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
-        self.dec_matrix = jnp.transpose(self.inc_matrix)
+        self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
         self.inames = instruction_names()
         self.ni = len(self.inames)
 
@@ -56,7 +56,7 @@ class Machine(hk.RNNCore):
         data = self.state_data(new_state)
         new_data_value = self.read_value(data_p, data)
         new_halted = self.state_halted(new_state)
-        return (new_data_value, new_halted), new_state
+        return new_state, new_state
 
     def read_value(self, data_p, data):
         return jnp.matmul(data_p.T, data).T
@@ -145,7 +145,14 @@ class Machine(hk.RNNCore):
         next_data_p = halted[0] * data_p + halted[1] * new_data_p
         next_data = halted[0] * data + halted[1] * new_data
         next_pc = halted[0] * pc + halted[1] * new_pc
-        next_halted = jnp.array([halted[0] + halted[1]*sel[0], halted[1]*sel[1]])
+        halting = 0.0
+        not_halting = 0.0
+        for i in range(self.ni):
+            if self.is_instr('STOP', i):
+                halting += sel[i]
+            else:
+                not_halting += sel[i]
+        next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
         next_data = jnp.reshape(next_data, self.n*self.n)
         next_state = jnp.concatenate((next_data_p, next_data, next_pc, next_halted))
         return next_state
@@ -183,8 +190,8 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  (logits, halted), _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
-  return (logits, halted)
+  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
+  return states
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
@@ -224,20 +231,6 @@ def main(_):
 
     train_data = itertools.cycle(train_data_inc(D.value))
 
-    params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
-    opt_init, _ = make_optimizer()
-
-    loss_fn = jax.jit(loss_fn)
-
-    rng = hk.PRNGSequence(SEED.value)
-    initial_params = params_init(next(rng), next(train_data))
-    initial_opt_state = opt_init(initial_params)
-    state = TrainingState(params=initial_params, opt_state=initial_opt_state)
-
-    #for step in range(TRAINING_STEPS.value + 1):
-    #    t = next(train_data)
-    #    state = update(state, t)
-
     code = jnp.zeros([5, 3])
     code = code.at[(0,0)].set(1)
     code = code.at[(1,1)].set(1)
@@ -255,11 +248,10 @@ def main(_):
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        (logits, _) = forward_fn(params, t['input'])
-        #print('input:', t['input'])
-        #print(logits)
+        outputs = forward_fn(params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
-        print('output steps:', to_discrete(logits))
+        #print('output steps:', to_discrete(logits))
+        print('outputs:', outputs)
 
 if __name__ == '__main__':
     app.run(main)
