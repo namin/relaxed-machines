@@ -3,8 +3,8 @@
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
 
-The code parameterizes the neural network. The parameters represent the
-code, and we learn the code.
+The code parameterizes the neural network.
+The parameters represent the code, and we learn the code.
 
 We initialize the code with all STOPs.
 
