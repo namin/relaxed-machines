@@ -13,8 +13,7 @@ counting while stopping before the needed incrementing.
 The code parameterizes the neural network.
 The parameters represent the code, and we learn the code.
 
-We initialize the code with all STOPs if NOP is unavailable;
-otherwise with all NOPS except a STOP at last.
+We initialize the code with all STOPs.
 
 The learning task is to learn counting (modulo n) by incrementing d times,
 that is f(x)=(x+d) % n.
@@ -126,7 +125,7 @@ class Machine(hk.RNNCore):
         return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
-        code = jnp.array([[1.0 if (i==0 and (not self.has_nop or l==self.n-1)) or (i==self.ni-1 and (self.has_nop and l!=self.n-1)) else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.ni)] for l in range(self.n)])
         def code_fun(shape, dtype):
             return code
         return code_fun
@@ -160,11 +159,12 @@ def sequence_loss(t) -> jnp.ndarray:
   # Note: this function is impure; we hk.transform() it below.
   # the [-1] is to consider only the final output, not the intermediary data points
   (logits, halted) = forward(t['input'])
-  log_probs = jax.nn.log_softmax(logits[-1])
-  log_probs_halted = jax.nn.log_softmax(halted[-1])
+  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits[-1])
+  log_probs_halted = jax.nn.log_softmax(SOFTMAX_SHARP.value*halted[-1])
 
   one_hot_labels = t['target'][-1]
-  loss = -jnp.sum(one_hot_labels * log_probs) + log_probs_halted[0]
+  loss = -jnp.sum(one_hot_labels * log_probs)
+  loss -= log_probs_halted[0]
   return loss
 
 @jax.jit
