@@ -73,11 +73,7 @@ class Machine(hk.RNNCore):
         self.has_inc2 = INC2.value
         self.init_nop = self.has_nop and INIT_NOP.value
         self.stop_matrix = jnp.identity(self.n)
-        self.inc_matrix =  jnp.identity(self.n)
-        a0 = self.inc_matrix[0]
-        for i in range(self.n-1):
-            self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
-        self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
+        self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
         self.data_instructions = [self.stop_matrix]
         self.pc_instructions = [self.stop_matrix]
         if self.has_inc:
