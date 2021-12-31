@@ -215,7 +215,7 @@ def main(_):
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        logits = forward_fn(state.params, t['input'])
+        (logits, _) = forward_fn(state.params, t['input'])
         #print('input:', t['input'])
         #print(logits)
         print('input:', jnp.argmax(t['input']).item())
