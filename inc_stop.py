@@ -146,8 +146,16 @@ def train_data_inc(d):
         r.append({'input':data, 'target':target})
     return r
 
-def to_discrete(a):
-    return [jnp.argmax(x).item() for x in a]
+def to_instruction(x):
+    ni = 2 # number of instructions
+    t = jnp.zeros(ni)
+    for i in range(len(x)):
+        j = i % ni
+        t = t.at[j].set(t[j]+x[i])
+    return t
+
+def to_discrete(a, fn=lambda x: x):
+    return [jnp.argmax(fn(x)).item() for x in a]
 
 def main(_):
     #flags.FLAGS([""])
@@ -170,7 +178,7 @@ def main(_):
 
     #print(state.params['machine']['code'])
     print('MACHINE CODE')
-    print(to_discrete(state.params['machine']['code']))
+    print(to_discrete(state.params['machine']['code'], fn=to_instruction))
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
