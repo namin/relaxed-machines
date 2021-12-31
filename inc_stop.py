@@ -146,6 +146,9 @@ def train_data_inc(d):
         r.append({'input':data, 'target':target})
     return r
 
+def to_discrete(a):
+    return [jnp.argmax(x).item() for x in a]
+
 def main(_):
     #flags.FLAGS([""])
 
@@ -165,13 +168,18 @@ def main(_):
         t = next(train_data)
         state = update(state, t)
 
-    print(state.params['machine']['code'])
+    #print(state.params['machine']['code'])
+    print('MACHINE CODE')
+    print(to_discrete(state.params['machine']['code']))
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        print('input :', t['input'])
-        print(forward_fn(state.params, t['input']))
+        logits = forward_fn(state.params, t['input'])
+        #print('input:', t['input'])
+        #print(logits)
+        print('input:', jnp.argmax(t['input']).item())
+        print(to_discrete(logits))
 
 if __name__ == '__main__':
     app.run(main)
