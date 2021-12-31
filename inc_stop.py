@@ -1,5 +1,4 @@
-"""A differentiable machine that only understands `INC` and `STOP`,
-and optionally `NOP` and `DEC`.
+"""A differentiable machine that understands `STOP` and a subset of `INC`, `DEC`, `NOP`.
 
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
@@ -41,6 +40,7 @@ import optax
 import itertools
 
 NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is available as an instruction')
+INC = flags.DEFINE_boolean('inc', True, 'whether INC is available as an instruction')
 DEC = flags.DEFINE_boolean('dec', False, 'whether DEC is available as an instruction')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
@@ -50,7 +50,9 @@ TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 def instruction_names():
-    names = ['STOP', 'INC']
+    names = ['STOP']
+    if INC.value:
+        names.append('INC')
     if DEC.value:
         names.append('DEC')
     if NOP.value:
@@ -65,6 +67,7 @@ class Machine(hk.RNNCore):
         super().__init__(name=name)
         self.n = N.value
         self.has_nop = NOP.value
+        self.has_inc = INC.value
         self.has_dec = DEC.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.identity(self.n)
@@ -72,10 +75,13 @@ class Machine(hk.RNNCore):
         for i in range(self.n-1):
             self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
-        self.data_instructions = [self.stop_matrix, self.inc_matrix]
-        self.pc_instructions = [self.stop_matrix, self.inc_matrix]
+        self.data_instructions = [self.stop_matrix]
+        self.pc_instructions = [self.stop_matrix]
+        if self.has_inc:
+            self.data_instructions.append(self.inc_matrix)
+            self.pc_instructions.append(self.inc_matrix)
         if self.has_dec:
-            self.dec_matrix =  jnp.transpose(self.inc_matrix)
+            self.dec_matrix = jnp.transpose(self.inc_matrix)
             self.data_instructions.append(self.dec_matrix)
             self.pc_instructions.append(self.inc_matrix)
         if self.has_nop:
