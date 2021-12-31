@@ -44,12 +44,8 @@ class Machine(hk.RNNCore):
         for i in range(self.n-1):
             self.inc_matrix = self.inc_matrix.at[i].set(self.inc_matrix[i+1])
         self.inc_matrix = self.inc_matrix.at[self.n-1].set(a0)
-        unique_instructions = [self.stop_matrix, self.inc_matrix]
-        self.ni = len(unique_instructions)
-        assert self.n >= self.ni
-        instructions = []
-        for i in range(self.n):
-            instructions.append(unique_instructions[i%self.ni])
+        instructions = [self.stop_matrix, self.inc_matrix]
+        self.ni = len(instructions)
         self.data_instructions = instructions
         self.pc_instructions = instructions
 
@@ -71,12 +67,12 @@ class Machine(hk.RNNCore):
         data = jax.nn.softmax(SOFTMAX_SHARP.value*state[0:self.n])
         pc = jax.nn.softmax(SOFTMAX_SHARP.value*state[self.n:2*self.n])
         halted = jax.nn.softmax(SOFTMAX_SHARP.value*state[2*self.n:2*self.n+2])
-        sel = jnp.zeros(self.n)
+        sel = jnp.zeros(self.ni)
         for i in range(self.n):
             sel += pc[i] * jax.nn.softmax(SOFTMAX_SHARP.value*code[i])
         data_instr = jnp.reshape(jnp.zeros(self.n*self.n), (self.n, self.n))
         pc_instr = jnp.reshape(jnp.zeros(self.n*self.n), (self.n, self.n))
-        for i in range(self.n):
+        for i in range(self.ni):
             data_instr += sel[i] * self.data_instructions[i]
             pc_instr += sel[i] * self.pc_instructions[i]
         next_data = halted[0] * data + halted[1] * jnp.matmul(data, data_instr)
@@ -89,10 +85,10 @@ class Machine(hk.RNNCore):
         return next_state
 
     def get_code(self):
-        return hk.get_parameter('code', [self.n, self.n], init=self.make_code_fun())
+        return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
-        code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.n)] for l in range(self.n)])
+        code = jnp.array([[1.0 if i==0 else 0.0 for i in range(self.ni)] for l in range(self.n)])
         def code_fun(shape, dtype):
             return code
         return code_fun
@@ -149,16 +145,8 @@ def train_data_inc(d):
         r.append({'input':data, 'target':target})
     return r
 
-def to_instruction(x):
-    ni = 2 # number of instructions
-    t = jnp.zeros(ni)
-    for i in range(len(x)):
-        j = i % ni
-        t = t.at[j].set(t[j]+x[i])
-    return t
-
-def to_discrete(a, fn=lambda x: x):
-    return [jnp.argmax(fn(x)).item() for x in a]
+def to_discrete(a):
+    return [jnp.argmax(x).item() for x in a]
 
 def main(_):
     #flags.FLAGS([""])
@@ -181,7 +169,7 @@ def main(_):
 
     #print(state.params['machine']['code'])
     print('MACHINE CODE')
-    print(to_discrete(state.params['machine']['code'], fn=to_instruction))
+    print(to_discrete(state.params['machine']['code']))
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
