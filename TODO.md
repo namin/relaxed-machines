@@ -3,6 +3,8 @@ Next steps (TODOs)
 
 - [ ] Flesh out a machine with a proper stack and more instructions.
 - [ ] Define sketches.
+  - [ ] Could implement a "soft" sketch as initialization.
+  - [ ] Could implement a "hard" sketch by restricting code parameters to holes. 
 - [ ] Write proper tests.
 
 ## Done
