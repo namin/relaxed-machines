@@ -169,8 +169,7 @@ def forward(input) -> jnp.ndarray:
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
-  # Note: this function is impure; we hk.transform() it below.
-  # the [-1] is to consider only the final output, not the intermediary data points
+  # Note the [-1] is to consider only the final output, not the intermediary data points.
   (logits, halted) = forward(t['input'])
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits[-1])
   log_probs_halted = jax.nn.log_softmax(SOFTMAX_SHARP.value*halted[-1])
