@@ -51,14 +51,21 @@ class Machine(hk.RNNCore):
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
-        new_data_value = new_state[self.n:2*self.n] # TODO: use the data pointer
+        data_p = new_state[0:self.n]
+        data = new_state[self.n:self.n*self.n+self.n]
+        data = jnp.reshape(data, [self.n, self.n])
+        new_data_value = self.read_value(data_p, data)
         new_halted = new_state[-3:-1]
         return (new_data_value, new_halted), new_state
+
+    def read_value(self, pointer, data):
+        return jnp.matmul(pointer.T, data).T
 
     def is_instr(self, iname, index):
         return self.inames[index] == iname
 
     def execute_instr(self, i, data_p, data, pc):
+        # TODO
         if self.is_instr('STOP', i):
             pass
         elif self.is_instr('DUP', i):
