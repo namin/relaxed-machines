@@ -4,6 +4,13 @@ and optionally `NOP`.
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
 
+Internally, the state also keeps track of whether the machine has halted,
+to avoid running instructions after a STOP.
+STOP and NOP have the same data and pc matrices (the identity function),
+the difference is that STOP also also increases the `halted` state.
+Without a `halted` state, the machine could get away with diffuse code,
+counting without incrementing in order.
+
 The code parameterizes the neural network.
 The parameters represent the code, and we learn the code.
 
