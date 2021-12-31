@@ -1,7 +1,8 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Flesh out a machine with a proper stack and more instructions.
+- [ ] Flesh out a machine with a proper data stack and more instructions.
+- [ ] Flesh out a machine with labels and branching and subroutines.
 - [ ] Define sketches.
   - [ ] Could implement a "soft" sketch as initialization.
   - [ ] Could implement a "hard" sketch by restricting code parameters to holes. 
