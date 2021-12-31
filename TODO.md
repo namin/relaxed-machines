@@ -5,7 +5,6 @@ Next steps (TODOs)
 - [ ] Define sketches.
 - [ ] Make the machine code symbolic at the end.
 - [ ] Write proper tests.
-- [ ] Perhaps, no need for number flag n to be uniform.
 
 ## Done
 
@@ -14,3 +13,7 @@ Next steps (TODOs)
       Done by adding `halted` to state.
 
 - [x] The to_discrete function needs to take into account all the positions that could be one instruction.
+
+- [x] Perhaps, no need for number flag n to be uniform.
+      Not needed for instructions, but needed otherwise
+      because of the uniform way instruction matrices operate on data and pc.

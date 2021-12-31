@@ -24,7 +24,7 @@ import optax
 
 import itertools
 
-N = flags.DEFINE_integer('n', 5, 'uniform number: of integers, of lines of code, of instructions (with dups)')
+N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
