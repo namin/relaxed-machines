@@ -5,8 +5,6 @@ There is also a program counter and a code bank.
 
 Internally, the state also keeps track of whether the machine has halted,
 to avoid running instructions after a STOP.
-STOP and NOP have the same data and pc matrices (the identity function),
-the difference is that STOP also also increases the `halted` state.
 Without a `halted` state, the machine could get away with diffuse code,
 counting while stopping before the needed incrementing.
 
