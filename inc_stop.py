@@ -32,7 +32,7 @@ import optax
 
 import itertools
 
-NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is an instruction')
+NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is available as an instruction')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
