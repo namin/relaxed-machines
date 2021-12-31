@@ -75,11 +75,7 @@ class Machine(hk.RNNCore):
         self.data_instructions = [self.stop_matrix, self.inc_matrix]
         self.pc_instructions = [self.stop_matrix, self.inc_matrix]
         if self.has_dec:
-            self.dec_matrix =  jnp.identity(self.n)
-            an = self.dec_matrix[-1]
-            for i in range(1, self.n):
-                self.dec_matrix = self.dec_matrix.at[i].set(self.dec_matrix[i-1])
-            self.dec_matrix = self.dec_matrix.at[0].set(an)
+            self.dec_matrix =  jnp.transpose(self.inc_matrix)
             self.data_instructions.append(self.dec_matrix)
             self.pc_instructions.append(self.inc_matrix)
         if self.has_nop:
