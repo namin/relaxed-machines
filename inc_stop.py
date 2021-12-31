@@ -28,7 +28,7 @@ N = flags.DEFINE_integer('n', 5, 'uniform number: of integers, of lines of code,
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
-TRAINING_STEPS = flags.DEFINE_integer('training_steps', 10000, '')
+TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 class Machine(hk.RNNCore):
@@ -77,10 +77,7 @@ class Machine(hk.RNNCore):
             pc_instr += sel[i] * self.pc_instructions[i]
         next_data = halted[0] * data + halted[1] * jnp.matmul(data, data_instr)
         next_pc = halted[0] * pc + halted[1] * jnp.matmul(pc, pc_instr)
-        instrs = jnp.zeros(self.ni)
-        for i in range(self.n):
-            instrs += instrs.at[i%self.ni].set(sel[i])
-        next_halted = jnp.array([halted[0] + halted[1]*instrs[0], halted[1]*instrs[1]])
+        next_halted = jnp.array([halted[0] + halted[1]*sel[0], halted[1]*sel[1]])
         next_state = jnp.concatenate((next_data, next_pc, next_halted))
         return next_state
 
