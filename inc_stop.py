@@ -111,8 +111,8 @@ class Machine(hk.RNNCore):
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
             sel += pc[i] * jax.nn.softmax(SOFTMAX_SHARP.value*code[i])
-        data_instr = jnp.reshape(jnp.zeros(self.n*self.n), (self.n, self.n))
-        pc_instr = jnp.reshape(jnp.zeros(self.n*self.n), (self.n, self.n))
+        data_instr = jnp.zeros([self.n,self.n])
+        pc_instr = jnp.zeros([self.n,self.n])
         for i in range(self.ni):
             data_instr += sel[i] * self.data_instructions[i]
             pc_instr += sel[i] * self.pc_instructions[i]
