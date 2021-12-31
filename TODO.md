@@ -2,7 +2,7 @@ Next steps (TODOs)
 ----------
 
 - [ ] Flesh out a machine with a proper data stack and more instructions.
-  - [ ] Instructions DUP, ADD, enough to multiply by a constant.
+  - [ ] Instructions `DUP`, `ADD`, enough to multiply by a constant.
   - [ ] Add instruction to push integer.
 - [ ] Flesh out a machine with labels and branching.
 - [ ] Flesh out a machine with subroutines.
