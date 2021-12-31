@@ -198,13 +198,12 @@ def forward(input) -> jnp.ndarray:
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
-  # Note the [-1] is to consider only the final output, not the intermediary data points.
   (logits, halted) = forward(t['input'])
-  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits[-1])
+  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits)
   log_probs_halted = jax.nn.log_softmax(SOFTMAX_SHARP.value*halted[-1])
 
   one_hot_labels = t['target']
-  loss = -jnp.sum(one_hot_labels * log_probs)
+  loss = -jnp.sum(one_hot_labels * log_probs) / N.value
   loss -= log_probs_halted[0]
   return loss
 
@@ -219,10 +218,13 @@ def update(state: TrainingState, t) -> TrainingState:
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
 def train_data_inc(d):
+    assert d == 2
+    assert N.value == 5
     r = []
     for i in range(N.value):
         data = jax.nn.one_hot(i, N.value)
-        target = jax.nn.one_hot((i*d)%N.value, N.value)
+        j = (i*d)%N.value
+        target = jax.nn.one_hot([i, j, j, j, j], N.value)
         r.append({'input':data, 'target':target})
     return r
 
