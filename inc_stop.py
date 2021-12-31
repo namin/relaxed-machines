@@ -1,4 +1,4 @@
-"""A differentiable machine that understands `STOP` and a subset of `INC`, `DEC`, `NOP`.
+"""A differentiable machine that understands `STOP` and a subset of `INC`, `DEC`, `NOP`, `INC2`.
 
 There is no data stack, just a data point.
 There is also a program counter and a code bank.
@@ -39,6 +39,7 @@ import itertools
 NOP = flags.DEFINE_boolean('nop', False, 'whether NOP is available as an instruction')
 INC = flags.DEFINE_boolean('inc', True, 'whether INC is available as an instruction')
 DEC = flags.DEFINE_boolean('dec', False, 'whether DEC is available as an instruction')
+INC2 = flags.DEFINE_boolean('inc2', False, 'whether INC2 is available as an instruction')
 INIT_NOP = flags.DEFINE_boolean('init_nop', False, 'whether to intialize with NOPs mostly as opposed to STOPs; only effective with --nop.')
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers and number of lines of code')
 D = flags.DEFINE_integer('d', 3, 'learn f(x)=(x+d)%n')
@@ -53,6 +54,8 @@ def instruction_names():
         names.append('INC')
     if DEC.value:
         names.append('DEC')
+    if INC2.value:
+        names.append('INC2')
     if NOP.value:
         names.append('NOP')
     return names
@@ -67,6 +70,7 @@ class Machine(hk.RNNCore):
         self.has_nop = NOP.value
         self.has_inc = INC.value
         self.has_dec = DEC.value
+        self.has_inc2 = INC2.value
         self.init_nop = self.has_nop and INIT_NOP.value
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.identity(self.n)
@@ -82,6 +86,9 @@ class Machine(hk.RNNCore):
         if self.has_dec:
             self.dec_matrix = jnp.transpose(self.inc_matrix)
             self.data_instructions.append(self.dec_matrix)
+            self.pc_instructions.append(self.inc_matrix)
+        if self.has_inc2:
+            self.data_instructions.append(jnp.matmul(self.inc_matrix, self.inc_matrix))
             self.pc_instructions.append(self.inc_matrix)
         if self.has_nop:
             self.data_instructions.append(self.stop_matrix)
