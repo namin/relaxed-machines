@@ -116,6 +116,17 @@ class InstructionSet:
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
+    # TODO: consider moving read_value to MachineState
+    #       so `mask` can be there
+    def mask(self, state):
+        data_p = self.s.data_p(state)
+        data = self.s.data(state)
+        top = self.read_value(data_p, data)
+        r = jnp.zeros(self.n*2)
+        r = r.at[0:self.n].set(top)
+        r = r.at[self.n:self.n*2].set(data_p)
+        return r
+
     def print(self, state):
         # here rather than in MachineState so we can conveniently read from stack
         data_p = self.s.data_p(state)
@@ -239,13 +250,17 @@ def forward(input) -> jnp.ndarray:
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
   return states
 
+def mask_each(xs):
+    i = get_instr_set()
+    return jnp.array([i.mask(x) for x in xs])
+
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   # We compute the loss over the ENTIRE state at each step...
   # ... definitely cheating.
-  states = forward(t['input'])
+  states = mask_each(forward(t['input']))
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
-  one_hot_labels = t['target']
+  one_hot_labels = mask_each(t['target'])
   loss = -jnp.sum(one_hot_labels * log_probs) / N.value
   return loss
 
@@ -293,6 +308,9 @@ def to_discrete_item(x):
 def to_discrete(a):
     return [to_discrete_item(x) for x in a]
 
+def get_instr_set():
+    return InstructionSet(N.value, MachineState(N.value))
+
 def main(_):
     #flags.FLAGS([""])
 
@@ -318,7 +336,7 @@ def main(_):
         print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
     header()
-    instr_set = InstructionSet(N.value, MachineState(N.value))
+    instr_set = get_instr_set()
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
