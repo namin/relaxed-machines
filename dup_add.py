@@ -90,10 +90,7 @@ class InstructionSet:
         return nr
 
     def step(self, code, state):
-        data_p = self.sm(self.s.data_p(state))
-        data = self.sm_over_data(self.s.data(state))
-        pc = self.sm(self.s.pc(state))
-        halted = self.sm(self.s.halted(state))
+        (data_p, data, pc, halted) = self.s.unpack(state, self.sm)
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
             sel += pc[i] * self.sm(code[i])
@@ -113,9 +110,6 @@ class InstructionSet:
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
         next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
         return next_state
-
-    def sm_over_data(self, data):
-        return self.s.over_data(data, self.sm)
 
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
@@ -149,6 +143,14 @@ class MachineState:
         halted = jnp.array([0, 1])
         state = self.pack(data_p, data, pc, halted)
         return state
+
+    def unpack(self, state, fn=lambda x: x):
+        data_p = fn(self.data_p(state))
+        data = self.over_data(self.data(state), fn)
+        pc = fn(self.pc(state))
+        halted = fn(self.halted(state))
+        return (data_p, data, pc, halted)
+
 
     def pack(self, data_p, data, pc, halted):
         data = jnp.reshape(data, self.n*self.n)
