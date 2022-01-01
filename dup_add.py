@@ -263,8 +263,6 @@ def mask_each(xs):
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
-  # We compute the loss over the ENTIRE state at each step...
-  # ... definitely cheating.
   states = mask_each(forward(t['input']))
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
   one_hot_labels = mask_each(t['target'])
