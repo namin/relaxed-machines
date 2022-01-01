@@ -34,12 +34,58 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-def instruction_names():
-    return ['DUP', 'ADD', 'STOP']
+class InstructionSet:
+    def __init__(self, n):
+        self.n = n
+        self.instruction_names = ['DUP', 'ADD', 'STOP']
+        self.index_STOP = 2
+        self.ni = len(self.instruction_names)
+        self.stop_matrix = jnp.identity(self.n)
+        self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
+        self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
+        assert self.is_instr('STOP', self.index_STOP)
+
+    def read_value(self, data_p, data):
+        return jnp.matmul(data_p.T, data).T
+
+    def write_value(self, data_p, data, data_value):
+        old = jnp.outer(data_p, jnp.ones(self.n)) * data
+        new = jnp.outer(data_p, data_value)
+        return data - old + new
+
+    def is_instr(self, name, index):
+        return self.instruction_names[index] == name
+
+    def execute_instr(self, i, data_p, data, pc):
+        if self.is_instr('STOP', i):
+            return (data_p, data, pc)
+        next_pc = jnp.matmul(pc, self.inc_matrix)
+        if self.is_instr('DUP', i):
+            data_value = self.read_value(data_p, data)
+            next_data_p = jnp.matmul(data_p, self.inc_matrix)
+            next_data = self.write_value(next_data_p, data, data_value)
+            return (next_data_p, next_data, next_pc)
+        elif self.is_instr('ADD', i):
+            n1 = self.read_value(data_p, data)
+            next_data_p = jnp.matmul(data_p, self.dec_matrix)
+            n2 = self.read_value(next_data_p, data)
+            nr = self.add(n1, n2)
+            next_data = self.write_value(next_data_p, data, nr)
+            return (next_data_p, next_data, next_pc)
+        # let an error be...
+
+    def add(self, n1, n2):
+        nr = jnp.zeros(self.n)
+        m = jnp.identity(self.n)
+        for i in range(self.n):
+            nr += n2[i] * jnp.matmul(n1, m)
+            m = jnp.matmul(m, self.inc_matrix)
+        return nr
 
 class MachineState:
     def __init__(self, n):
         self.n = n
+        self.total = self.n*self.n+2*self.n+2
 
     def initial(self):
         data_p = jnp.zeros(self.n).at[0].set(1)
@@ -89,56 +135,12 @@ class Machine(hk.RNNCore):
         super().__init__(name=name)
         self.n = N.value
         self.s = MachineState(self.n)
-        self.stop_matrix = jnp.identity(self.n)
-        self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
-        self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
-        self.inames = instruction_names()
-        self.ni = len(self.inames)
+        self.i = InstructionSet(self.n)
+        self.ni = self.i.ni
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
-        data_p = self.s.data_p(new_state)
-        data = self.s.over_data(self.s.data(new_state), sm)
-        new_data_value = self.read_value(data_p, data)
-        new_halted = self.s.halted(new_state)
-        return (new_data_value, new_halted), new_state
-
-    def read_value(self, data_p, data):
-        return jnp.matmul(data_p.T, data).T
-
-    def write_value(self, data_p, data, data_value):
-        old = jnp.outer(data_p, jnp.ones(self.n)) * data
-        new = jnp.outer(data_p, data_value)
-        return data - old + new
-
-    def is_instr(self, iname, index):
-        return self.inames[index] == iname
-
-    def execute_instr(self, i, data_p, data, pc):
-        if self.is_instr('STOP', i):
-            return (data_p, data, pc)
-        next_pc = jnp.matmul(pc, self.inc_matrix)
-        if self.is_instr('DUP', i):
-            data_value = self.read_value(data_p, data)
-            next_data_p = jnp.matmul(data_p, self.inc_matrix)
-            next_data = self.write_value(next_data_p, data, data_value)
-            return (next_data_p, next_data, next_pc)
-        elif self.is_instr('ADD', i):
-            n1 = self.read_value(data_p, data)
-            next_data_p = jnp.matmul(data_p, self.dec_matrix)
-            n2 = self.read_value(next_data_p, data)
-            nr = self.add(n1, n2)
-            next_data = self.write_value(next_data_p, data, nr)
-            return (next_data_p, next_data, next_pc)
-        # let an error be...
-
-    def add(self, n1, n2):
-        nr = jnp.zeros(self.n)
-        m = jnp.identity(self.n)
-        for i in range(self.n):
-            nr += n2[i] * jnp.matmul(n1, m)
-            m = jnp.matmul(m, self.inc_matrix)
-        return nr
+        return new_state, new_state
 
     def initial_state(self, batch_size: Optional[int]):
         assert batch_size is None
@@ -157,20 +159,15 @@ class Machine(hk.RNNCore):
         new_data = jnp.zeros([self.n, self.n])
         new_pc = jnp.zeros(self.n)
         for i in range(self.ni):
-            (delta_data_p, delta_data, delta_pc) = self.execute_instr(i, data_p, data, pc)
+            (delta_data_p, delta_data, delta_pc) = self.i.execute_instr(i, data_p, data, pc)
             new_data_p += sel[i] * delta_data_p
             new_data += sel[i] * delta_data
             new_pc += sel[i] * delta_pc
         next_data_p = halted[0] * data_p + halted[1] * new_data_p
         next_data = halted[0] * data + halted[1] * new_data
         next_pc = halted[0] * pc + halted[1] * new_pc
-        halting = 0.0
-        not_halting = 0.0
-        for i in range(self.ni):
-            if self.is_instr('STOP', i):
-                halting += sel[i]
-            else:
-                not_halting += sel[i]
+        halting = sel[self.i.index_STOP]
+        not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
         next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
         return next_state
@@ -180,7 +177,7 @@ class Machine(hk.RNNCore):
 
     def make_code_fun(self):
         # all STOPs
-        code = jnp.array([[1.0 if self.is_instr('STOP', i) else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        code = jnp.array([[1.0 if self.i.is_instr('STOP', i) else 0.0 for i in range(self.ni)] for l in range(self.n)])
 
         def code_fun(shape, dtype):
             return code
@@ -207,18 +204,15 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  (logits, halted), _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
-  return (logits, halted)
+  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.s.total) for i in range(sequence_length)], initial_state)
+  return states
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
-  (logits, halted) = forward(t['input'])
-  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*logits)
-  log_probs_halted = jax.nn.log_softmax(SOFTMAX_SHARP.value*halted[-1])
-
+  states = forward(t['input'])
+  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
   one_hot_labels = t['target']
   loss = -jnp.sum(one_hot_labels * log_probs) / N.value
-  loss -= log_probs_halted[0]
   return loss
 
 @jax.jit
@@ -297,9 +291,9 @@ def forward_test(_):
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        logits, _ = forward_fn(params, t['input'])
+        states = forward_fn(params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
-        print('output steps:', to_discrete(logits))
+        #print('output steps:', [s.to_discrete(state) for state in states])
         #print('outputs:', outputs)
 
 if __name__ == '__main__':
