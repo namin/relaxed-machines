@@ -39,5 +39,7 @@ Next steps (TODOs)
       Feels like cheating.
       Even with that, the machine does not learn well at higher `d`s and `n`s. For example, `--d 4 --n 16`.
       Then, the machine needs the whole state, including the dirty bits due to popping.
+      
+- [ ] Would it help to penalize stack underflow?
 
 - [ ] Add instruction to push integer.
