@@ -274,7 +274,7 @@ def code_for_mul(d, n):
 def train_data_inc(d):
     n = N.value
     code = code_for_mul(d, n)
-    i = InstructionSet(n, MachineState(n))
+    i = DiscreteInstructionSet(n, MachineState(n))
     r = []
     for j in range(N.value):
         data = jax.nn.one_hot(j, N.value)
