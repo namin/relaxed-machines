@@ -259,20 +259,21 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
-def code_for_double():
-    code = jnp.zeros([5, 3])
-    code = code.at[(0,0)].set(1)
-    code = code.at[(1,1)].set(1)
-    code = code.at[(2,2)].set(1)
-    code = code.at[(3,2)].set(1)
-    code = code.at[(4,2)].set(1)
+def code_for_mul(d, n):
+    assert d > 0
+    assert 2*(d-1)+1 <= n
+    code = jnp.zeros([n, len(INSTRUCTION_NAMES)])
+    for i in range(d-1):
+        code = code.at[(i,0)].set(1)
+    for i in range(d-1):
+        code = code.at[(i+d-1,1)].set(1)
+    for i in range(d-1+d-1,n):
+        code = code.at[(i,2)].set(1)
     return code
 
 def train_data_inc(d):
     n = N.value
-    assert d == 2
-    assert n == 5
-    code = code_for_double()
+    code = code_for_mul(d, n)
     i = InstructionSet(n, MachineState(n))
     r = []
     for j in range(N.value):
