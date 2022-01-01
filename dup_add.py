@@ -116,13 +116,30 @@ class InstructionSet:
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
+    def print(self, state):
+        # here rather than in MachineState so we can conveniently read from stack
+        data_p = self.s.data_p(state)
+        data = self.s.data(state)
+        data_top_of_stack = self.read_value(data_p, data)
+        pc = self.s.pc(state)
+        halted = self.s.halted(state)
+
+        data_p = to_discrete_item(data_p)
+        data_top_of_stack = to_discrete_item(data_top_of_stack)
+        data = to_discrete(data)
+        pc = to_discrete_item(pc)
+        halted = True if to_discrete_item(halted)==0 else False
+
+        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}
+data: {data}
+""")
+
 class DiscreteInstructionSet(InstructionSet):
     def __init__(self, n, s):
         super().__init__(n, s)
 
     def sm(self, x):
         return x
-
 
 class MachineState:
     def __init__(self, n):
@@ -269,8 +286,11 @@ def train_data_inc(d):
         r.append({'input':data, 'target': jnp.array(target)})
     return r
 
+def to_discrete_item(x):
+    return jnp.argmax(x).item()
+
 def to_discrete(a):
-    return [jnp.argmax(x).item() for x in a]
+    return [to_discrete_item(x) for x in a]
 
 def main(_):
     #flags.FLAGS([""])
@@ -291,39 +311,19 @@ def main(_):
         t = next(train_data)
         state = update(state, t)
 
-    #print(state.params['machine']['code'])
     print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
     names = INSTRUCTION_NAMES
     print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
+    instr_set = InstructionSet(N.value, MachineState(N.value))
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
         states = forward_fn(state.params, t['input'])
-        #print('input:', t['input'])
-        #print(logits)
         print('input:', jnp.argmax(t['input']).item())
-        # TODO: pretty print state
-        #print('output steps:', to_discrete(logits))
-
-def forward_test(_):
-    train_data = itertools.cycle(train_data_inc(D.value))
-
-    code = code_for_double()
-
-    params = {'machine': {'code': code } }
-
-    print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
-    names = instruction_names()
-    print([names[x]for x in to_discrete(params['machine']['code'])])
-
-    _, forward_fn = hk.without_apply_rng(hk.transform(forward))
-    for i in range(N.value):
-        t = next(train_data)
-        states = forward_fn(params, t['input'])
-        print('input:', jnp.argmax(t['input']).item())
-        #print('output steps:', [s.to_discrete(state) for state in states])
-        #print('outputs:', outputs)
+        for j, s in enumerate(states):
+            print('###', j)
+            instr_set.print(s)
 
 if __name__ == '__main__':
     app.run(main)
