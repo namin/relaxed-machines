@@ -3,7 +3,8 @@ Next steps (TODOs)
 
 - [ ] Flesh out a machine with a proper data stack and more instructions.
   - [x] Instructions `DUP`, `ADD`, enough to multiply by a constant.
-    - [ ] Avoid giving away entire state for at each step for learning. Experiment with masks.
+    - [x] Avoid giving away entire state for at each step for learning. Experiment with masks.
+          Able to learn with a mask of data stack pointer and top of stack.
   - [ ] Add instruction to push integer.
 - [ ] Flesh out a machine with labels and branching.
 - [ ] Flesh out a machine with subroutines.
