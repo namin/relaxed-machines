@@ -48,14 +48,6 @@ class InstructionSet:
         self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
         assert self.is_instr('STOP', self.index_STOP)
 
-    def read_value(self, data_p, data):
-        return jnp.matmul(data_p.T, data).T
-
-    def write_value(self, data_p, data, data_value):
-        old = jnp.outer(data_p, jnp.ones(self.n)) * data
-        new = jnp.outer(data_p, data_value)
-        return data - old + new
-
     def is_instr(self, name, index):
         return self.instruction_names[index] == name
 
@@ -64,16 +56,16 @@ class InstructionSet:
             return (data_p, data, pc)
         next_pc = jnp.matmul(pc, self.inc_matrix)
         if self.is_instr('DUP', i):
-            data_value = self.read_value(data_p, data)
+            data_value = self.s.read_value(data_p, data)
             next_data_p = jnp.matmul(data_p, self.inc_matrix)
-            next_data = self.write_value(next_data_p, data, data_value)
+            next_data = self.s.write_value(next_data_p, data, data_value)
             return (next_data_p, next_data, next_pc)
         elif self.is_instr('ADD', i):
-            n1 = self.read_value(data_p, data)
+            n1 = self.s.read_value(data_p, data)
             next_data_p = jnp.matmul(data_p, self.dec_matrix)
-            n2 = self.read_value(next_data_p, data)
+            n2 = self.s.read_value(next_data_p, data)
             nr = self.add(n1, n2)
-            next_data = self.write_value(next_data_p, data, nr)
+            next_data = self.s.write_value(next_data_p, data, nr)
             return (next_data_p, next_data, next_pc)
         # let an error be...
 
@@ -116,31 +108,6 @@ class InstructionSet:
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
-    def mask(self, state):
-        data_p = self.s.data_p(state)
-        data = self.s.data(state)
-        top = self.read_value(data_p, data)
-        r = jnp.zeros(self.n*2)
-        r = r.at[0:self.n].set(top)
-        r = r.at[self.n:self.n*2].set(data_p)
-        return r
-
-    def print(self, state):
-        # here rather than in MachineState so we can conveniently read from stack
-        data_p = self.s.data_p(state)
-        data = self.s.data(state)
-        data_top_of_stack = self.read_value(data_p, data)
-        pc = self.s.pc(state)
-        halted = self.s.halted(state)
-
-        data_p = to_discrete_item(data_p)
-        data_top_of_stack = to_discrete_item(data_top_of_stack)
-        data = to_discrete(data)
-        pc = to_discrete_item(pc)
-        halted = 'True ' if to_discrete_item(halted)==0 else 'False'
-
-        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}, data: {data}""")
-
 class DiscreteInstructionSet(InstructionSet):
     def __init__(self, n, s):
         super().__init__(n, s)
@@ -152,6 +119,14 @@ class MachineState:
     def __init__(self, n):
         self.n = n
         self.total = self.n*self.n+2*self.n+2
+
+    def read_value(self, data_p, data):
+        return jnp.matmul(data_p.T, data).T
+
+    def write_value(self, data_p, data, data_value):
+        old = jnp.outer(data_p, jnp.ones(self.n)) * data
+        new = jnp.outer(data_p, data_value)
+        return data - old + new
 
     def initial(self):
         data_p = jnp.zeros(self.n).at[0].set(1)
@@ -189,6 +164,30 @@ class MachineState:
         for i in range(self.n):
             data = data.at[i].set(fn(data[i]))
         return data
+
+    def mask(self, state):
+        data_p = self.data_p(state)
+        data = self.data(state)
+        top = self.read_value(data_p, data)
+        r = jnp.zeros(self.n*2)
+        r = r.at[0:self.n].set(top)
+        r = r.at[self.n:self.n*2].set(data_p)
+        return r
+
+    def print(self, state):
+        data_p = self.data_p(state)
+        data = self.data(state)
+        data_top_of_stack = self.read_value(data_p, data)
+        pc = self.pc(state)
+        halted = self.halted(state)
+
+        data_p = to_discrete_item(data_p)
+        data_top_of_stack = to_discrete_item(data_top_of_stack)
+        data = to_discrete(data)
+        pc = to_discrete_item(pc)
+        halted = 'True ' if to_discrete_item(halted)==0 else 'False'
+
+        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}, data: {data}""")
 
 class Machine(hk.RNNCore):
     def __init__(
@@ -249,7 +248,7 @@ def forward(input) -> jnp.ndarray:
   return states
 
 def mask_each(xs):
-    i = get_instr_set()
+    i = MachineState(N.value)
     return jnp.array([i.mask(x) for x in xs])
 
 def sequence_loss(t) -> jnp.ndarray:
@@ -306,9 +305,6 @@ def to_discrete_item(x):
 def to_discrete(a):
     return [to_discrete_item(x) for x in a]
 
-def get_instr_set():
-    return InstructionSet(N.value, MachineState(N.value))
-
 def main(_):
     #flags.FLAGS([""])
 
@@ -334,14 +330,14 @@ def main(_):
         print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
     header()
-    instr_set = get_instr_set()
+    s = MachineState(N.value)
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
         states = forward_fn(state.params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
-        for j, s in enumerate(states):
-            instr_set.print(s)
+        for j, st in enumerate(states):
+            s.print(st)
     header()
 
 if __name__ == '__main__':
