@@ -37,6 +37,50 @@ SEED = flags.DEFINE_integer('seed', 42, '')
 def instruction_names():
     return ['DUP', 'ADD', 'STOP']
 
+class MachineState:
+    def __init__(self, n):
+        self.n = n
+
+    def initial(self):
+        data_p = jnp.zeros(self.n).at[0].set(1)
+        data = jnp.zeros([self.n, self.n])
+        for i in range(self.n):
+            data = data.at[(i,0)].set(1)
+        pc = jnp.zeros([self.n]).at[0].set(1)
+        halted = jnp.array([0, 1])
+        state = self.pack(data_p, data, pc, halted)
+        return state
+
+    def pack(self, data_p, data, pc, halted):
+        data = jnp.reshape(data, self.n*self.n)
+        return jnp.concatenate((data_p, data, pc, halted))
+
+    def initial_top_of_stack(self, state, data_value):
+        # assumes the pointer is at the reset
+        next_state = state.at[self.n:self.n*2].set(data_value)
+        return next_state
+
+    def data_p(self, state):
+        return state[0:self.n]
+
+    def data(self, state):
+        data = state[self.n:self.n*self.n+self.n]
+        return jnp.reshape(data, [self.n, self.n])
+
+    def pc(self, state):
+        return state[self.n*self.n+self.n:self.n*self.n+2*self.n]
+
+    def halted(self, state):
+        return state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2]
+
+    def over_data(self, data, fn):
+        for i in range(self.n):
+            data = data.at[i].set(fn(data[i]))
+        return data
+
+def sm(x):
+    return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+
 class Machine(hk.RNNCore):
     def __init__(
             self,
@@ -44,6 +88,7 @@ class Machine(hk.RNNCore):
     ):
         super().__init__(name=name)
         self.n = N.value
+        self.s = MachineState(self.n)
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
         self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
@@ -52,10 +97,10 @@ class Machine(hk.RNNCore):
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
-        data_p = self.state_data_p(new_state)
-        data = self.sm_data(self.state_data(new_state))
+        data_p = self.s.data_p(new_state)
+        data = self.s.over_data(self.s.data(new_state), sm)
         new_data_value = self.read_value(data_p, data)
-        new_halted = self.state_halted(new_state)
+        new_halted = self.s.halted(new_state)
         return (new_data_value, new_halted), new_state
 
     def read_value(self, data_p, data):
@@ -96,47 +141,18 @@ class Machine(hk.RNNCore):
         return nr
 
     def initial_state(self, batch_size: Optional[int]):
-        data_p = jnp.zeros(self.n).at[0].set(1)
-        data = jnp.zeros([self.n, self.n])
-        for i in range(self.n):
-            data = data.at[(i,0)].set(1)
-        data = jnp.reshape(data, self.n*self.n)
-        pc = jnp.zeros([self.n]).at[0].set(1)
-        halted = jnp.array([0, 1])
-        state = jnp.concatenate((data_p, data, pc, halted))
         assert batch_size is None
-        return state
-
-    def sm(self, x):
-        return jax.nn.softmax(SOFTMAX_SHARP.value*x)
-
-    def state_data_p(self, state):
-        return state[0:self.n]
-
-    def state_data(self, state):
-        data = state[self.n:self.n*self.n+self.n]
-        return jnp.reshape(data, [self.n, self.n])
-
-    def state_pc(self, state):
-        return state[self.n*self.n+self.n:self.n*self.n+2*self.n]
-
-    def state_halted(self, state):
-        return state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2]
-
-    def sm_data(self, data):
-        for i in range(self.n):
-            data = data.at[i].set(self.sm(data[i]))
-        return data
+        return self.s.initial()
 
     def step(self, state):
         code = self.get_code()
-        data_p = self.sm(self.state_data_p(state))
-        data = self.sm_data(self.state_data(state))
-        pc = self.sm(self.state_pc(state))
-        halted = self.sm(self.state_halted(state))
+        data_p = sm(self.s.data_p(state))
+        data = self.s.over_data(self.s.data(state), sm)
+        pc = sm(self.s.pc(state))
+        halted = sm(self.s.halted(state))
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
-            sel += pc[i] * self.sm(code[i])
+            sel += pc[i] * sm(code[i])
         new_data_p = jnp.zeros(self.n)
         new_data = jnp.zeros([self.n, self.n])
         new_pc = jnp.zeros(self.n)
@@ -156,8 +172,7 @@ class Machine(hk.RNNCore):
             else:
                 not_halting += sel[i]
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        next_data = jnp.reshape(next_data, self.n*self.n)
-        next_state = jnp.concatenate((next_data_p, next_data, next_pc, next_halted))
+        next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
         return next_state
 
     def get_code(self):
@@ -172,8 +187,7 @@ class Machine(hk.RNNCore):
         return code_fun
 
     def load_data(self, state, data_value):
-        # assumes the pointer is at the reset
-        next_state = state.at[self.n:self.n*2].set(data_value)
+        next_state = self.s.initial_top_of_stack(state, data_value)
         return next_state
 
 class TrainingState(NamedTuple):
