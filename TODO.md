@@ -2,7 +2,8 @@ Next steps (TODOs)
 ----------
 
 - [ ] Flesh out a machine with a proper data stack and more instructions.
-  - [ ] Instructions `DUP`, `ADD`, enough to multiply by a constant.
+  - [x] Instructions `DUP`, `ADD`, enough to multiply by a constant.
+    - [ ] Avoid giving away entire state for at each step for learning. Experiment with masks.
   - [ ] Add instruction to push integer.
 - [ ] Flesh out a machine with labels and branching.
 - [ ] Flesh out a machine with subroutines.
@@ -10,7 +11,6 @@ Next steps (TODOs)
   - [ ] Could implement a "soft" sketch as initialization.
   - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
   - [ ] Could implement sketches like ∂4.
-- [ ] Could define the loss over an arbitrary mask of the state, not just the "top of stack".
 - [ ] Write proper tests.
 
 ## Done
