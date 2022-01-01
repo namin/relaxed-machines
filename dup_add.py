@@ -59,7 +59,9 @@ class InstructionSet:
 
     def pop(self, data_p, data):
         data_value = self.s.read_value(data_p, data)
-        next_data = self.s.write_value(data_p, data, self.clear_data_value)
+        # Learning is easier when leaving the state dirty...
+        #next_data = self.s.write_value(data_p, data, self.clear_data_value)
+        next_data = data
         next_data_p = jnp.matmul(data_p, self.dec_matrix)
         return (next_data_p, next_data, data_value)
 
@@ -182,7 +184,8 @@ class MachineState:
         r = jnp.zeros(self.n*2)
         r = r.at[0:self.n].set(top)
         r = r.at[self.n:self.n*2].set(data_p)
-        return r
+        # Give up on on smaller state, and give out the whole state...
+        return state
 
     def print(self, state):
         data_p = self.data_p(state)
