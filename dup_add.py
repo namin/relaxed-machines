@@ -84,13 +84,13 @@ class InstructionSet:
         return nr
 
     def step(self, code, state):
-        data_p = sm(self.s.data_p(state))
-        data = self.s.over_data(self.s.data(state), sm)
-        pc = sm(self.s.pc(state))
-        halted = sm(self.s.halted(state))
+        data_p = self.sm(self.s.data_p(state))
+        data = self.sm_over_data(self.s.data(state))
+        pc = self.sm(self.s.pc(state))
+        halted = self.sm(self.s.halted(state))
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
-            sel += pc[i] * sm(code[i])
+            sel += pc[i] * self.sm(code[i])
         new_data_p = jnp.zeros(self.n)
         new_data = jnp.zeros([self.n, self.n])
         new_pc = jnp.zeros(self.n)
@@ -107,6 +107,19 @@ class InstructionSet:
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
         next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
         return next_state
+
+    def sm_over_data(self, data):
+        return self.s.over_data(data, self.sm)
+
+    def sm(self, x):
+        return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+
+class DiscreteInstructionSet(InstructionSet):
+    def __init__(self, n, s):
+        super().__init__(n, s)
+
+    def sm(self, x):
+        return x
 
 
 class MachineState:
@@ -150,9 +163,6 @@ class MachineState:
         for i in range(self.n):
             data = data.at[i].set(fn(data[i]))
         return data
-
-def sm(x):
-    return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
 class Machine(hk.RNNCore):
     def __init__(
