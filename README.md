@@ -14,3 +14,7 @@ Baby steps (see the [log](TODO.md#log)):
 
 ## Resources
 - Chapter 3 (∂4: A Differentiable Forth Interpreter) of Matko Bošnjak's Ph.D thesis, [On Differentiable Interpreters](https://discovery.ucl.ac.uk/id/eprint/10121772/), UCL, 2021.
+
+## Acks
+
+Many thanks to [Rob Zinkov](https://zinkov.com) for discussions, insights, and suggestions.
