@@ -116,8 +116,6 @@ class InstructionSet:
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
-    # TODO: consider moving read_value to MachineState
-    #       so `mask` can be there
     def mask(self, state):
         data_p = self.s.data_p(state)
         data = self.s.data(state)
