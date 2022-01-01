@@ -29,6 +29,7 @@ import itertools
 
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers, number of lines of code and of data stack size')
 D = flags.DEFINE_integer('d', 2, 'learn f(x)=(x*d)%n')
+M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
@@ -60,8 +61,8 @@ class InstructionSet:
     def pop(self, data_p, data):
         data_value = self.s.read_value(data_p, data)
         # Learning is easier when leaving the state dirty...
-        #next_data = self.s.write_value(data_p, data, self.clear_data_value)
         next_data = data
+        # next_data = self.s.write_value(data_p, data, self.clear_data_value)
         next_data_p = jnp.matmul(data_p, self.dec_matrix)
         return (next_data_p, next_data, data_value)
 
@@ -345,7 +346,7 @@ def main(_):
     header()
     s = MachineState(N.value)
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
-    for i in range(N.value):
+    for i in range(M.value):
         t = next(train_data)
         states = forward_fn(state.params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
