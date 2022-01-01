@@ -46,10 +46,22 @@ class InstructionSet:
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
         self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
+        self.clear_data_value = jnp.zeros(self.n).at[0].set(1)
         assert self.is_instr('STOP', self.index_STOP)
 
     def is_instr(self, name, index):
         return self.instruction_names[index] == name
+
+    def push(self, data_p, data, data_value):
+        next_data_p = jnp.matmul(data_p, self.inc_matrix)
+        next_data = self.s.write_value(next_data_p, data, data_value)
+        return (next_data_p, next_data)
+
+    def pop(self, data_p, data):
+        data_value = self.s.read_value(data_p, data)
+        next_data = self.s.write_value(data_p, data, self.clear_data_value)
+        next_data_p = jnp.matmul(data_p, self.dec_matrix)
+        return (next_data_p, next_data, data_value)
 
     def execute_instr(self, i, data_p, data, pc):
         if self.is_instr('STOP', i):
@@ -57,16 +69,14 @@ class InstructionSet:
         next_pc = jnp.matmul(pc, self.inc_matrix)
         if self.is_instr('DUP', i):
             data_value = self.s.read_value(data_p, data)
-            next_data_p = jnp.matmul(data_p, self.inc_matrix)
-            next_data = self.s.write_value(next_data_p, data, data_value)
+            (next_data_p, next_data) = self.push(data_p, data, data_value)
             return (next_data_p, next_data, next_pc)
         elif self.is_instr('ADD', i):
-            n1 = self.s.read_value(data_p, data)
-            next_data_p = jnp.matmul(data_p, self.dec_matrix)
-            n2 = self.s.read_value(next_data_p, data)
+            (data_p, data, n1) = self.pop(data_p, data)
+            (data_p, data, n2) = self.pop(data_p, data)
             nr = self.add(n1, n2)
-            next_data = self.s.write_value(next_data_p, data, nr)
-            return (next_data_p, next_data, next_pc)
+            (data_p, data) = self.push(data_p, data, nr)
+            return (data_p, data, next_pc)
         # let an error be...
 
     def add(self, n1, n2):
