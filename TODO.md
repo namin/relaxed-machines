@@ -34,6 +34,6 @@ Next steps (TODOs)
 
 - [ ] The machine only learns well when giving it the data top of stack and pointer at each step.
       Feels like cheating.
-      Even with that, the machine does not learn well at high `d`s (with increased `n`). For example, `--d 4 --n 16`.
+      Even with that, the machine does not learn well at higher `d`s and `n`s. For example, `--d 4 --n 16`.
 
 - [ ] Add instruction to push integer.
