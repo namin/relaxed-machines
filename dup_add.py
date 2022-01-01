@@ -128,11 +128,9 @@ class InstructionSet:
         data_top_of_stack = to_discrete_item(data_top_of_stack)
         data = to_discrete(data)
         pc = to_discrete_item(pc)
-        halted = True if to_discrete_item(halted)==0 else False
+        halted = 'True ' if to_discrete_item(halted)==0 else 'False'
 
-        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}
-data: {data}
-""")
+        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}, data: {data}""")
 
 class DiscreteInstructionSet(InstructionSet):
     def __init__(self, n, s):
@@ -243,6 +241,8 @@ def forward(input) -> jnp.ndarray:
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
+  # We compute the loss over the ENTIRE state at each step...
+  # ... definitely cheating.
   states = forward(t['input'])
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
   one_hot_labels = t['target']
@@ -322,7 +322,6 @@ def main(_):
         states = forward_fn(state.params, t['input'])
         print('input:', jnp.argmax(t['input']).item())
         for j, s in enumerate(states):
-            print('###', j)
             instr_set.print(s)
 
 if __name__ == '__main__':
