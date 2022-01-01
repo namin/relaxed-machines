@@ -312,10 +312,12 @@ def main(_):
         t = next(train_data)
         state = update(state, t)
 
-    print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
-    names = INSTRUCTION_NAMES
-    print([names[x]for x in to_discrete(state.params['machine']['code'])])
+    def header():
+        print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
+        names = INSTRUCTION_NAMES
+        print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
+    header()
     instr_set = InstructionSet(N.value, MachineState(N.value))
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
@@ -324,6 +326,7 @@ def main(_):
         print('input:', jnp.argmax(t['input']).item())
         for j, s in enumerate(states):
             instr_set.print(s)
+    header()
 
 if __name__ == '__main__':
     app.run(main)
