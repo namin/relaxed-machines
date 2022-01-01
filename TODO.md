@@ -7,6 +7,7 @@ Next steps (TODOs)
   - [ ] Could implement a "soft" sketch as initialization.
   - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
   - [ ] Could implement sketches like ∂4.
+- [ ] Add batching.
 - [ ] Write proper tests.
 
 ## Log
@@ -21,8 +22,10 @@ Next steps (TODOs)
 
 - [x] Implemented instructions `STOP`, `INC`, `DEC`, `INC2`, `NOP`.
 
-- [ ] Considered making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
+- [x] Gave up on making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
       This confuses some instruction matrix operations that operate on data and pc.
+
+- [ ] Consider refactoring the logic outside the network module as for `dup_add` to continue using this file as a starting point.
 
 ### [`dup_add`](dup_add.py)
 
@@ -34,6 +37,6 @@ Next steps (TODOs)
 
 - [ ] The machine only learns well when giving it the data top of stack and pointer at each step.
       Feels like cheating.
-      Even with that, the machine does not learn well at high `d`s (with increased `n`). For example, `--d 4 --n 16`.
+      Even with that, the machine does not learn well at higher `d`s and `n`s. For example, `--d 4 --n 16`.
 
 - [ ] Add instruction to push integer.

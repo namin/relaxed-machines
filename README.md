@@ -3,7 +3,7 @@ Relaxed Machines
 
 Explorations in neuro-symbolic differentiable interpreters.
 
-Baby steps:
+Baby steps (see the [log](TODO.md#log)):
 1. [`inc_stop`](inc_stop.py)
 2. [`dup_add`](dup_add.py)
 
