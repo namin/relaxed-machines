@@ -34,11 +34,13 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
+INSTRUCTION_NAMES = ['DUP', 'ADD', 'STOP']
+
 class InstructionSet:
     def __init__(self, n, s):
         self.n = n
         self.s = s
-        self.instruction_names = ['DUP', 'ADD', 'STOP']
+        self.instruction_names = INSTRUCTION_NAMES
         self.index_STOP = 2
         self.ni = len(self.instruction_names)
         self.stop_matrix = jnp.identity(self.n)
@@ -219,7 +221,7 @@ def forward(input) -> jnp.ndarray:
   sequence_length = core.n
   initial_state = core.initial_state(batch_size=None)
   initial_state = core.load_data(initial_state, input)
-  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.s.total) for i in range(sequence_length)], initial_state)
+  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
   return states
 
 def sequence_loss(t) -> jnp.ndarray:
@@ -240,15 +242,31 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
+def code_for_double():
+    code = jnp.zeros([5, 3])
+    code = code.at[(0,0)].set(1)
+    code = code.at[(1,1)].set(1)
+    code = code.at[(2,2)].set(1)
+    code = code.at[(3,2)].set(1)
+    code = code.at[(4,2)].set(1)
+    return code
+
 def train_data_inc(d):
+    n = N.value
     assert d == 2
-    assert N.value == 5
+    assert n == 5
+    code = code_for_double()
+    i = InstructionSet(n, MachineState(n))
     r = []
-    for i in range(N.value):
-        data = jax.nn.one_hot(i, N.value)
-        j = (i*d)%N.value
-        target = jax.nn.one_hot([i, j, j, j, j], N.value)
-        r.append({'input':data, 'target':target})
+    for j in range(N.value):
+        data = jax.nn.one_hot(j, N.value)
+        state = i.s.initial()
+        state = i.s.initial_top_of_stack(state, data)
+        target = []
+        for k in range(N.value):
+            state = i.step(code, state)
+            target.append(state)
+        r.append({'input':data, 'target': jnp.array(target)})
     return r
 
 def to_discrete(a):
@@ -275,27 +293,23 @@ def main(_):
 
     #print(state.params['machine']['code'])
     print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
-    names = instruction_names()
+    names = INSTRUCTION_NAMES
     print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(N.value):
         t = next(train_data)
-        (logits, _) = forward_fn(state.params, t['input'])
+        states = forward_fn(state.params, t['input'])
         #print('input:', t['input'])
         #print(logits)
         print('input:', jnp.argmax(t['input']).item())
-        print('output steps:', to_discrete(logits))
+        # TODO: pretty print state
+        #print('output steps:', to_discrete(logits))
 
 def forward_test(_):
     train_data = itertools.cycle(train_data_inc(D.value))
 
-    code = jnp.zeros([5, 3])
-    code = code.at[(0,0)].set(1)
-    code = code.at[(1,1)].set(1)
-    code = code.at[(2,2)].set(1)
-    code = code.at[(3,2)].set(1)
-    code = code.at[(4,2)].set(1)
+    code = code_for_double()
 
     params = {'machine': {'code': code } }
 
