@@ -1,11 +1,6 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Flesh out a machine with a proper data stack and more instructions.
-  - [x] Instructions `DUP`, `ADD`, enough to multiply by a constant.
-    - [x] Avoid giving away entire state for at each step for learning. Experiment with masks.
-          Able to learn with a mask of data stack pointer and top of stack.
-  - [ ] Add instruction to push integer.
 - [ ] Flesh out a machine with labels and branching.
 - [ ] Flesh out a machine with subroutines.
 - [ ] Define sketches.
@@ -14,16 +9,31 @@ Next steps (TODOs)
   - [ ] Could implement sketches like ∂4.
 - [ ] Write proper tests.
 
-## Done
+## Log
 
-- [x] Avoid the RNN artifact of having to specify all the intermediate data points.
-      Need to encode that any instruction after stop is ignored.
-      Done by adding `halted` to state.
+### [`inc_stop`](inc_stop.py)
 
-- [x] The to_discrete function needs to take into account all the positions that could be one instruction.
+- [x] Exploited a `halted` state to avoid running after stopping.
 
-- [x] Perhaps, no need for number flag n to be uniform.
-      Not needed for instructions, but needed otherwise
-      because of the uniform way instruction matrices operate on data and pc.
+- [x] Read out the machine code symbolically at the end.
 
-- [x] Make the machine code symbolic at the end.
+- [x] Added flags for selecting different subsets of the instruction set.
+
+- [x] Implemented instructions `STOP`, `INC`, `DEC`, `INC2`, `NOP`.
+
+- [ ] Considered making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
+      This confuses some instruction matrix operations that operate on data and pc.
+
+### [`dup_add`](dup_add.py)
+
+- [x] Refactored most of the instruction and state logic to be outside the network module, to good effect.
+
+- [x] Implemented principled masking over state, to avoid learning over entire state at each step.
+
+- [x] Implemented instructions `STOP`, `DUP`, `ADD` and learning task to multiply by a constant.
+
+- [ ] The machine only learns well when giving it the data top of stack and pointer at each step.
+      Feels like cheating.
+      Even with that, the machine does not learn well at high `d`s (with increased `n`). For example, `--d 4 --n 16`.
+
+- [ ] Add instruction to push integer.
