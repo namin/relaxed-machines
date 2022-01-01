@@ -35,8 +35,9 @@ TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 class InstructionSet:
-    def __init__(self, n):
+    def __init__(self, n, s):
         self.n = n
+        self.s = s
         self.instruction_names = ['DUP', 'ADD', 'STOP']
         self.index_STOP = 2
         self.ni = len(self.instruction_names)
@@ -81,6 +82,32 @@ class InstructionSet:
             nr += n2[i] * jnp.matmul(n1, m)
             m = jnp.matmul(m, self.inc_matrix)
         return nr
+
+    def step(self, code, state):
+        data_p = sm(self.s.data_p(state))
+        data = self.s.over_data(self.s.data(state), sm)
+        pc = sm(self.s.pc(state))
+        halted = sm(self.s.halted(state))
+        sel = jnp.zeros(self.ni)
+        for i in range(self.n):
+            sel += pc[i] * sm(code[i])
+        new_data_p = jnp.zeros(self.n)
+        new_data = jnp.zeros([self.n, self.n])
+        new_pc = jnp.zeros(self.n)
+        for i in range(self.ni):
+            (delta_data_p, delta_data, delta_pc) = self.execute_instr(i, data_p, data, pc)
+            new_data_p += sel[i] * delta_data_p
+            new_data += sel[i] * delta_data
+            new_pc += sel[i] * delta_pc
+        next_data_p = halted[0] * data_p + halted[1] * new_data_p
+        next_data = halted[0] * data + halted[1] * new_data
+        next_pc = halted[0] * pc + halted[1] * new_pc
+        halting = sel[self.index_STOP]
+        not_halting = 1-halting
+        next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
+        next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
+        return next_state
+
 
 class MachineState:
     def __init__(self, n):
@@ -135,7 +162,7 @@ class Machine(hk.RNNCore):
         super().__init__(name=name)
         self.n = N.value
         self.s = MachineState(self.n)
-        self.i = InstructionSet(self.n)
+        self.i = InstructionSet(self.n, self.s)
         self.ni = self.i.ni
 
     def __call__(self, inputs, prev_state):
@@ -148,29 +175,7 @@ class Machine(hk.RNNCore):
 
     def step(self, state):
         code = self.get_code()
-        data_p = sm(self.s.data_p(state))
-        data = self.s.over_data(self.s.data(state), sm)
-        pc = sm(self.s.pc(state))
-        halted = sm(self.s.halted(state))
-        sel = jnp.zeros(self.ni)
-        for i in range(self.n):
-            sel += pc[i] * sm(code[i])
-        new_data_p = jnp.zeros(self.n)
-        new_data = jnp.zeros([self.n, self.n])
-        new_pc = jnp.zeros(self.n)
-        for i in range(self.ni):
-            (delta_data_p, delta_data, delta_pc) = self.i.execute_instr(i, data_p, data, pc)
-            new_data_p += sel[i] * delta_data_p
-            new_data += sel[i] * delta_data
-            new_pc += sel[i] * delta_pc
-        next_data_p = halted[0] * data_p + halted[1] * new_data_p
-        next_data = halted[0] * data + halted[1] * new_data
-        next_pc = halted[0] * pc + halted[1] * new_pc
-        halting = sel[self.i.index_STOP]
-        not_halting = 1-halting
-        next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
-        return next_state
+        return self.i.step(code, state)
 
     def get_code(self):
         return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
