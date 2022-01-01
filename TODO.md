@@ -21,8 +21,10 @@ Next steps (TODOs)
 
 - [x] Implemented instructions `STOP`, `INC`, `DEC`, `INC2`, `NOP`.
 
-- [ ] Considered making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
+- [x] Gave up on making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
       This confuses some instruction matrix operations that operate on data and pc.
+
+- [ ] Consider refactoring the logic outside the network module as for `dup_add` to continue using this file as a starting point.
 
 ### [`dup_add`](dup_add.py)
 
