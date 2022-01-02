@@ -29,6 +29,7 @@ import itertools
 
 N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers, number of lines of code and of data stack size')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
+S = flags.DEFINE_integer('s', 50, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
@@ -74,7 +75,7 @@ class InstructionSet:
             next_pc = jnp.matmul(next_pc, code)
         elif instr == 'JMP0_A':
             p = jnp.dot(reg_a, jax.nn.one_hot(0, self.n))
-            next_pc = (1-p)*next_pc + p*jnp.matmul(next_pc, code)
+            next_pc = (1-p)*jnp.matmul(next_pc, self.inc_matrix) + p*jnp.matmul(next_pc, code)
         else:
             assert instr == 'NOP'
         return (reg_a, reg_b, next_pc)
@@ -233,9 +234,9 @@ def make_optimizer() -> optax.GradientTransformation:
 
 def forward(input) -> jnp.ndarray:
   core = make_network()
-  sequence_length = core.n
+  sequence_length = S.value
   initial_state = core.initial_state(input, batch_size=None)
-  states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
+  states, _ = hk.dynamic_unroll(core, [jnp.zeros(sequence_length) for i in range(sequence_length)], initial_state)
   return states
 
 def mask_each(xs):
@@ -276,15 +277,24 @@ def train_data_inc():
     print('MACHINE CODE for training')
     print(i.discrete_code(code))
     r = []
-    for a in range(N.value):
-        for b in range(M.value):
-            reg_a = jax.nn.one_hot(a, N.value)
-            reg_b = jax.nn.one_hot(b, N.value)
+    for a in range(n):
+        for b in range(n):
+            #print(f"A = {a}, B = {b}")
+            reg_a = jax.nn.one_hot(a, n)
+            reg_b = jax.nn.one_hot(b, n)
             state = i.s.initial(reg_a, reg_b)
+            #i.s.print(state)
             target = []
-            for k in range(N.value):
+            for k in range(S.value):
                 state = i.step(code, state)
+                #i.s.print(state)
                 target.append(state)
+                if k==S.value-1:
+                    (res_a, res_b, res_pc, res_halted) = i.s.unpack(state)
+                    d_a = to_discrete_item(res_a)
+                    d_b = to_discrete_item(res_b)
+                    assert d_a == 0
+                    assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
             r.append({'input':(reg_a, reg_b), 'target': jnp.array(target)})
     return r
 
