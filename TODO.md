@@ -2,6 +2,22 @@ Next steps (TODOs)
 ----------
 
 - [ ] Flesh out a machine with labels and branching.
+
+  - [ ] A language with two registers (`A` and `B`) for defining addition by repeated increments.
+
+Initially: `RA=n`, `RB=m`
+
+Finally: `RA=0`, `RB=m+n`
+
+Code:
+```
+0 JMP0_A 4
+1 INC_B
+2 DEC_A
+3 JMP 0
+4 STOP
+```
+
 - [ ] Flesh out a machine with subroutines.
 - [ ] Define sketches.
   - [ ] Could implement a "soft" sketch as initialization.
