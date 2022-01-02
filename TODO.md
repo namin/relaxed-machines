@@ -11,11 +11,11 @@ Finally: `A=0`, `B=m+n`
 
 Code:
 ```
-0 JMP0_A 4
-1 INC_B
-2 DEC_A
-3 JMP 0
-4 STOP
+0 JMP0_A 6
+2 INC_B
+3 DEC_A
+4 JMP 0
+6 STOP
 ```
 
 - [ ] Flesh out a machine with subroutines.
