@@ -321,6 +321,7 @@ def main(_):
     n_train_data = len(train_data)
 
     train_data = itertools.cycle(train_data)
+    # I tried shuffling the order but it made learning worse.
     def some_train_data(rng):
         #x = jax.random.randint(rng, [], 0, n_train_data)
         s = next(train_data)
