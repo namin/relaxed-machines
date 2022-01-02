@@ -31,6 +31,14 @@ SEED = flags.DEFINE_integer('seed', 42, '')
 INSTRUCTION_NAMES = ['INC_B', 'DEC_A', 'JMP0_A', 'JMP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
+ADD_BY_INC = [
+    'JMP0_A', 6,
+    'INC_B',
+    'DEC_A',
+    'JMP', 0,
+    'STOP'
+]
+
 class InstructionSet:
     def __init__(self, n, s):
         self.n = n
@@ -253,14 +261,6 @@ def update(state: TrainingState, t) -> TrainingState:
   updates, new_opt_state = optimizer(gradients, state.opt_state)
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
-
-ADD_BY_INC = [
-    'JMP0_A', 6,
-    'INC_B',
-    'DEC_A',
-    'JMP', 0,
-    'STOP'
-]
 
 def train_data_inc():
     n = N.value
