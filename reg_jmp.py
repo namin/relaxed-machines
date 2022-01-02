@@ -269,7 +269,18 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
-def train_data_inc():
+def check_add_by_inc(i, inp, fin):
+    (reg_a, reg_b) = inp
+    state = fin
+    a = to_discrete_item(reg_a)
+    b = to_discrete_item(reg_b)
+    (res_a, res_b, res_pc, res_halted) = i.s.unpack(state)
+    d_a = to_discrete_item(res_a)
+    d_b = to_discrete_item(res_b)
+    assert d_a == 0
+    assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
+
+def train_data_add_by_inc():
     n = N.value
     l = L.value
     program = ADD_BY_INC
@@ -290,13 +301,9 @@ def train_data_inc():
                 state = i.step(code, state)
                 #i.s.print(state)
                 target.append(state)
-                if k==S.value-1:
-                    (res_a, res_b, res_pc, res_halted) = i.s.unpack(state)
-                    d_a = to_discrete_item(res_a)
-                    d_b = to_discrete_item(res_b)
-                    assert d_a == 0
-                    assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
-            r.append({'input':(reg_a, reg_b), 'target': jnp.array(target)})
+            t = {'input':(reg_a, reg_b), 'target': jnp.array(target)}
+            check_add_by_inc(i, t['input'], t['target'][-1])
+            r.append(t)
     return r
 
 def to_discrete_item(x):
@@ -308,20 +315,28 @@ def to_discrete(a):
 def main(_):
     #flags.FLAGS([""])
 
-    train_data = itertools.cycle(train_data_inc())
+    rng = hk.PRNGSequence(SEED.value)
+
+    train_data = train_data_add_by_inc()
+    n_train_data = len(train_data)
+
+    train_data = itertools.cycle(train_data)
+    def some_train_data(rng):
+        #x = jax.random.randint(rng, [], 0, n_train_data)
+        s = next(train_data)
+        return s
 
     params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
     opt_init, _ = make_optimizer()
 
     loss_fn = jax.jit(loss_fn)
 
-    rng = hk.PRNGSequence(SEED.value)
-    initial_params = params_init(next(rng), next(train_data))
+    initial_params = params_init(next(rng), some_train_data(next(rng)))
     initial_opt_state = opt_init(initial_params)
     state = TrainingState(params=initial_params, opt_state=initial_opt_state)
 
     for step in range(TRAINING_STEPS.value + 1):
-        t = next(train_data)
+        t = some_train_data(next(rng))
         state = update(state, t)
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
@@ -332,9 +347,10 @@ def main(_):
     header()
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(M.value):
-        t = next(train_data)
-        states = forward_fn(state.params, t['input'])
+        t = some_train_data(next(rng))
         inp = t['input']
+        states = forward_fn(state.params, inp)
+        check_add_by_inc(iset, inp, states[-1])
         print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
         for j, st in enumerate(states):
             iset.s.print(st)
