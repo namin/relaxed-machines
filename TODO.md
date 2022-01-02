@@ -43,7 +43,7 @@ Next steps (TODOs)
       
 - [ ] Would it help to penalize stack underflow?
 
-### ['asm'](asm.py)
+### [`asm`](asm.py)
 
 - [x] Flesh out a machine with labels and branching.
 
