@@ -27,63 +27,44 @@ import optax
 
 import itertools
 
-N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers, number of lines of code and of data stack size')
-A = flags.DEFINE_integer('a', 2, 'learn f(x)=(a*x+b)%n')
-B = flags.DEFINE_integer('b', 0, 'learn f(x)=(a*x+b)%n')
+N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers, number of lines of code and of data stack size')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
-P = flags.DEFINE_integer('p', -1, 'push instruction for each constant from 0 to argument')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-def get_instruction_names(n, p):
-    assert p <= n
-    names = []
-    if p>=0:
-        names.extend([str(i) for i in range(p+1)])
-    names.extend(['DUP', 'ADD', 'STOP'])
-    return names
+INSTRUCTION_NAMES = ['INC_B', 'DEC_A', 'JMP0_A', 'JMP', 'STOP']
+INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 class InstructionSet:
-    def __init__(self, n, p, s):
+    def __init__(self, n, s):
         self.n = n
-        self.p = p
         self.s = s
-        self.instruction_names = get_instruction_names(self.n, self.p)
-        self.ni = len(self.instruction_names)
-        self.index_STOP = self.ni-1
+        self.instruction_names = INSTRUCTION_NAMES
+        self.instruction_map = INSTRUCTION_MAP
+        self.ani = len(self.instruction_names)
+        assert self.ani <= self.n
+        self.ni = self.n # pad to be able to address each of the n lines of code
+        self.index_STOP = self.instruction_map['STOP']
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
         self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
-        self.clear_data_value = jnp.zeros(self.n).at[0].set(1)
         assert self.is_instr('STOP', self.index_STOP)
 
-    def push_instr_num(self, i):
-        return jax.nn.one_hot(i, self.n)
-
-    def is_push_instr(self, index):
-        return self.p>=0 and index <= self.p
+    def get_instruction_name(self, index):
+        if index < self.ani:
+            return self.instruction_names[index]
+        else:
+            return 'NOP'
 
     def is_instr(self, name, index):
-        return self.instruction_names[index] == name
-
-    def push(self, data_p, data, data_value):
-        next_data_p = jnp.matmul(data_p, self.inc_matrix)
-        next_data = self.s.write_value(next_data_p, data, data_value)
-        return (next_data_p, next_data)
-
-    def pop(self, data_p, data):
-        data_value = self.s.read_value(data_p, data)
-        # Learning is easier when leaving the state dirty...
-        next_data = data
-        # next_data = self.s.write_value(data_p, data, self.clear_data_value)
-        next_data_p = jnp.matmul(data_p, self.dec_matrix)
-        return (next_data_p, next_data, data_value)
+        return self.get_instruction_name(index) == name
 
     def execute_instr(self, i, data_p, data, pc):
-        if self.is_instr('STOP', i):
-            return (data_p, data, pc)
+        #if self.is_instr('STOP', i):
+        return (data_p, data, pc)
+        '''
         next_pc = jnp.matmul(pc, self.inc_matrix)
         if self.is_instr('DUP', i):
             data_value = self.s.read_value(data_p, data)
@@ -98,45 +79,59 @@ class InstructionSet:
         elif self.is_push_instr(i):
             (data_p, data) = self.push(data_p, data, self.push_instr_num(i))
             return (data_p, data, next_pc)
-
-        # let an error be...
-
-    def add(self, n1, n2):
-        nr = jnp.zeros(self.n)
-        m = jnp.identity(self.n)
-        for i in range(self.n):
-            nr += n2[i] * jnp.matmul(n1, m)
-            m = jnp.matmul(m, self.inc_matrix)
-        return nr
+        # let an error be...'''
 
     def step(self, code, state):
-        (data_p, data, pc, halted) = self.s.unpack(state, self.sm)
+        (reg_a, reg_b, pc, halted) = self.s.unpack(state, self.sm)
         sel = jnp.zeros(self.ni)
         for i in range(self.n):
             sel += pc[i] * self.sm(code[i])
-        new_data_p = jnp.zeros(self.n)
-        new_data = jnp.zeros([self.n, self.n])
+        new_reg_a = jnp.zeros(self.n)
+        new_reg_b = jnp.zeros(self.n)
         new_pc = jnp.zeros(self.n)
         for i in range(self.ni):
-            (delta_data_p, delta_data, delta_pc) = self.execute_instr(i, data_p, data, pc)
-            new_data_p += sel[i] * delta_data_p
-            new_data += sel[i] * delta_data
+            (delta_reg_a, delta_reg_b, delta_pc) = self.execute_instr(i, reg_a, reg_b, pc)
+            new_reg_a += sel[i] * delta_reg_a
+            new_reg_b += sel[i] * delta_reg_b
             new_pc += sel[i] * delta_pc
-        next_data_p = halted[0] * data_p + halted[1] * new_data_p
-        next_data = halted[0] * data + halted[1] * new_data
+        next_reg_a = halted[0] * reg_a + halted[1] * new_reg_a
+        next_reg_b = halted[0] * reg_b + halted[1] * new_reg_b
         next_pc = halted[0] * pc + halted[1] * new_pc
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        next_state = self.s.pack(next_data_p, next_data, next_pc, next_halted)
+        next_state = self.s.pack(next_reg_a, next_reg_b, next_pc, next_halted)
         return next_state
 
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
+    def program_to_one_hot(self, program):
+        np = len(program)
+        assert np <= self.n
+        p = [self.instruction_map.get(word, word) for word in program]
+        for i in range(np, self.n):
+            p.append(self.index_STOP)
+        r = jax.nn.one_hot(p, self.n)
+        return r
+
+    def discrete_code(self, code):
+        program = []
+        index = 0
+        while index < self.n:
+            w = to_discrete_item(code[index])
+            word = self.get_instruction_name(w)
+            program.append(word)
+            index += 1
+            if word.startswith('JMP') and index < self.n:
+                w = to_discrete_item(code[index])
+                program.append(w)
+                index += 1
+        return program
+
 class DiscreteInstructionSet(InstructionSet):
-    def __init__(self, n, p, s):
-        super().__init__(n, p, s)
+    def __init__(self, n, s):
+        super().__init__(n, s)
 
     def sm(self, x):
         return x
@@ -144,85 +139,52 @@ class DiscreteInstructionSet(InstructionSet):
 class MachineState:
     def __init__(self, n):
         self.n = n
-        self.total = self.n*self.n+2*self.n+2
+        self.total = 3*self.n+2
 
-    def read_value(self, data_p, data):
-        return jnp.matmul(data_p.T, data).T
-
-    def write_value(self, data_p, data, data_value):
-        old = jnp.outer(data_p, jnp.ones(self.n)) * data
-        new = jnp.outer(data_p, data_value)
-        return data - old + new
-
-    def initial(self):
-        data_p = jnp.zeros(self.n).at[0].set(1)
-        data = jnp.zeros([self.n, self.n])
-        for i in range(self.n):
-            data = data.at[(i,0)].set(1)
+    def initial(self, reg_a, reg_b):
         pc = jnp.zeros([self.n]).at[0].set(1)
         halted = jnp.array([0, 1])
-        state = self.pack(data_p, data, pc, halted)
+        state = self.pack(reg_a, reg_b, pc, halted)
         return state
 
     def unpack(self, state, fn=lambda x: x):
-        data_p = fn(self.data_p(state))
-        data = self.over_data(self.data(state), fn)
+        reg_a = fn(self.reg_a(state))
+        reg_b = fn(self.reg_b(state))
         pc = fn(self.pc(state))
         halted = fn(self.halted(state))
-        return (data_p, data, pc, halted)
+        return (reg_a, reg_b, pc, halted)
 
 
-    def pack(self, data_p, data, pc, halted):
-        data = jnp.reshape(data, self.n*self.n)
-        return jnp.concatenate((data_p, data, pc, halted))
+    def pack(self, reg_a, reg_b, pc, halted):
+        return jnp.concatenate((reg_a, reg_b, pc, halted))
 
-    def initial_top_of_stack(self, state, data_value):
-        # assumes the pointer is at the reset
-        next_state = state.at[self.n:self.n*2].set(data_value)
-        return next_state
-
-    def data_p(self, state):
+    def reg_a(self, state):
         return state[0:self.n]
 
-    def data(self, state):
-        data = state[self.n:self.n*self.n+self.n]
-        return jnp.reshape(data, [self.n, self.n])
+    def reg_b(self, state):
+        return state[self.n:2*self.n]
 
     def pc(self, state):
-        return state[self.n*self.n+self.n:self.n*self.n+2*self.n]
+        return state[2*self.n:3*self.n]
 
     def halted(self, state):
-        return state[self.n*self.n+2*self.n:self.n*self.n+2*self.n+2]
-
-    def over_data(self, data, fn):
-        for i in range(self.n):
-            data = data.at[i].set(fn(data[i]))
-        return data
+        return state[3*self.n:3*self.n+2]
 
     def mask(self, state):
-        data_p = self.data_p(state)
-        data = self.data(state)
-        top = self.read_value(data_p, data)
-        r = jnp.zeros(self.n*2)
-        r = r.at[0:self.n].set(top)
-        r = r.at[self.n:self.n*2].set(data_p)
-        # Give up on on smaller state, and give out the whole state...
         return state
 
     def print(self, state):
-        data_p = self.data_p(state)
-        data = self.data(state)
-        data_top_of_stack = self.read_value(data_p, data)
+        reg_a = self.reg_a(state)
+        reg_b = self.reg_b(state)
         pc = self.pc(state)
         halted = self.halted(state)
 
-        data_p = to_discrete_item(data_p)
-        data_top_of_stack = to_discrete_item(data_top_of_stack)
-        data = to_discrete(data)
+        reg_a = to_discrete_item(reg_a)
+        reg_b = to_discrete_item(reg_b)
         pc = to_discrete_item(pc)
         halted = 'True ' if to_discrete_item(halted)==0 else 'False'
 
-        print(f"""top: {data_top_of_stack}, pointer: {data_p}, pc: {pc}, halted: {halted}, data: {data}""")
+        print(f"""A: {reg_a}, B: {reg_b}, PC: {pc}, halted: {halted}""")
 
 class Machine(hk.RNNCore):
     def __init__(
@@ -231,18 +193,18 @@ class Machine(hk.RNNCore):
     ):
         super().__init__(name=name)
         self.n = N.value
-        self.p = P.value
         self.s = MachineState(self.n)
-        self.i = InstructionSet(self.n, self.p, self.s)
+        self.i = InstructionSet(self.n, self.s)
         self.ni = self.i.ni
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
         return new_state, new_state
 
-    def initial_state(self, batch_size: Optional[int]):
+    def initial_state(self, regs, batch_size: Optional[int]):
         assert batch_size is None
-        return self.s.initial()
+        (reg_a, reg_b) = regs
+        return self.s.initial(reg_a, reg_b)
 
     def step(self, state):
         code = self.get_code()
@@ -259,10 +221,6 @@ class Machine(hk.RNNCore):
             return code
         return code_fun
 
-    def load_data(self, state, data_value):
-        next_state = self.s.initial_top_of_stack(state, data_value)
-        return next_state
-
 class TrainingState(NamedTuple):
   params: hk.Params
   opt_state: optax.OptState
@@ -278,8 +236,7 @@ def make_optimizer() -> optax.GradientTransformation:
 def forward(input) -> jnp.ndarray:
   core = make_network()
   sequence_length = core.n
-  initial_state = core.initial_state(batch_size=None)
-  initial_state = core.load_data(initial_state, input)
+  initial_state = core.initial_state(input, batch_size=None)
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(core.n) for i in range(sequence_length)], initial_state)
   return states
 
@@ -305,47 +262,32 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
-def code_for_lin(a, b, n, p):
-    assert a > 0
-    assert 2*(a-1)+1 + (2 if b>0 else 0) <= n
-    assert p >= -1
-    names = get_instruction_names(n, p)
-    DUP_INDEX = 0+p+1
-    ADD_INDEX = 1+p+1
-    STOP_INDEX = 2+p+1
-    code = jnp.zeros([n, len(names)])
-    for i in range(a-1):
-        code = code.at[(i,DUP_INDEX)].set(1)
-    for i in range(a-1):
-        code = code.at[(i+a-1,ADD_INDEX)].set(1)
-    next = a-1+a-1
-    if b>0:
-        assert p > b
-        code = code.at[(next, b)].set(1)
-        next += 1
-        code = code.at[(next, ADD_INDEX)].set(1)
-        next += 1
-    for i in range(next,n):
-        code = code.at[(i,STOP_INDEX)].set(1)
-    return code
+ADD_BY_INC = [
+    'JMP0_A', 6,
+    'INC_B',
+    'DEC_A',
+    'JMP', 0,
+    'STOP'
+]
 
-def train_data_inc(a, b):
+def train_data_inc():
     n = N.value
-    p = P.value
-    code = code_for_lin(a, b, n, p)
+    program = ADD_BY_INC
+    i = DiscreteInstructionSet(n, MachineState(n))
+    code = i.program_to_one_hot(program)
     print('MACHINE CODE for training')
-    print(discrete_code(code))
-    i = DiscreteInstructionSet(n, p, MachineState(n))
+    print(i.discrete_code(code))
     r = []
-    for j in range(N.value):
-        data = jax.nn.one_hot(j, N.value)
-        state = i.s.initial()
-        state = i.s.initial_top_of_stack(state, data)
-        target = []
-        for k in range(N.value):
-            state = i.step(code, state)
-            target.append(state)
-        r.append({'input':data, 'target': jnp.array(target)})
+    for a in range(N.value):
+        for b in range(M.value):
+            reg_a = jax.nn.one_hot(a, N.value)
+            reg_b = jax.nn.one_hot(b, N.value)
+            state = i.s.initial(reg_a, reg_b)
+            target = []
+            for k in range(N.value):
+                state = i.step(code, state)
+                target.append(state)
+            r.append({'input':(reg_a, reg_b), 'target': jnp.array(target)})
     return r
 
 def to_discrete_item(x):
@@ -354,14 +296,10 @@ def to_discrete_item(x):
 def to_discrete(a):
     return [to_discrete_item(x) for x in a]
 
-def discrete_code(code):
-    names = get_instruction_names(N.value, P.value)
-    return [names[x]for x in to_discrete(code)]
-
 def main(_):
     #flags.FLAGS([""])
 
-    train_data = itertools.cycle(train_data_inc(A.value, B.value))
+    train_data = itertools.cycle(train_data_inc())
 
     params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
     opt_init, _ = make_optimizer()
@@ -377,19 +315,20 @@ def main(_):
         t = next(train_data)
         state = update(state, t)
 
+    iset = InstructionSet(N.value, MachineState(N.value))
     def header():
         print('MACHINE CODE learnt')
-        print(discrete_code(state.params['machine']['code']))
+        print(iset.discrete_code(state.params['machine']['code']))
 
     header()
-    s = MachineState(N.value)
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(M.value):
         t = next(train_data)
         states = forward_fn(state.params, t['input'])
-        print('input:', jnp.argmax(t['input']).item())
+        inp = t['input']
+        print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
         for j, st in enumerate(states):
-            s.print(st)
+            iset.s.print(st)
     header()
 
 if __name__ == '__main__':
