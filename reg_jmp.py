@@ -20,7 +20,7 @@ import optax
 
 import itertools
 
-N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers, number of lines of code and of data stack size')
+N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers and number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
