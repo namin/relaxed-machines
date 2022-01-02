@@ -21,9 +21,6 @@ Next steps (TODOs)
 
 - [x] Implemented instructions `STOP`, `INC`, `DEC`, `INC2`, `NOP`.
 
-- [x] Gave up on making uniform number flag non-uniform (e.g., separate for number of integers and number of lines of code).
-      This confuses some instruction matrix operations that operate on data and pc.
-
 - [ ] Consider refactoring the logic outside the network module as for `dup_add` to continue using this file as a starting point.
 
 ### [`dup_add`](dup_add.py)
@@ -48,5 +45,7 @@ Next steps (TODOs)
 - [x] Flesh out a machine with labels and branching.
 
   - [x] A language with two registers (`A` and `B`) for defining addition by repeated incrementation.
+
+- [x] Separate numbers for number of integers and lines of code.
 
 - [ ] Unroll the number of steps according to the computation.
