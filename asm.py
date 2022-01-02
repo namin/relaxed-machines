@@ -22,7 +22,7 @@ import itertools
 
 N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers, number of lines of code and of data stack size')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
-S = flags.DEFINE_integer('s', 50, 'number of steps when running the machine')
+S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
