@@ -30,25 +30,39 @@ import itertools
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers, number of lines of code and of data stack size')
 D = flags.DEFINE_integer('d', 2, 'learn f(x)=(x*d)%n')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
+P = flags.DEFINE_integer('p', -1, 'push instruction for each constant from 0 to argument')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-INSTRUCTION_NAMES = ['DUP', 'ADD', 'STOP']
+def get_instruction_names(n, p):
+    assert p <= n
+    names = []
+    if p>=0:
+        names.extend([str(i) for i in range(p)])
+    names.extend(['DUP', 'ADD', 'STOP'])
+    return names
 
 class InstructionSet:
-    def __init__(self, n, s):
+    def __init__(self, n, p, s):
         self.n = n
+        self.p = p
         self.s = s
-        self.instruction_names = INSTRUCTION_NAMES
-        self.index_STOP = 2
+        self.instruction_names = get_instruction_names(self.n, self.p)
         self.ni = len(self.instruction_names)
+        self.index_STOP = self.ni-1
         self.stop_matrix = jnp.identity(self.n)
         self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
         self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
         self.clear_data_value = jnp.zeros(self.n).at[0].set(1)
         assert self.is_instr('STOP', self.index_STOP)
+
+    def push_instr_num(self, i):
+        return jax.nn.one_hot(i, self.n)
+
+    def is_push_instr(self, index):
+        return self.p>=0 and index < self.p
 
     def is_instr(self, name, index):
         return self.instruction_names[index] == name
@@ -80,6 +94,10 @@ class InstructionSet:
             nr = self.add(n1, n2)
             (data_p, data) = self.push(data_p, data, nr)
             return (data_p, data, next_pc)
+        elif self.is_push_instr(i):
+            (data_p, data) = self.push(data_p, data, self.push_instr_num(i))
+            return (data_p, data, next_pc)
+
         # let an error be...
 
     def add(self, n1, n2):
@@ -116,8 +134,8 @@ class InstructionSet:
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
 
 class DiscreteInstructionSet(InstructionSet):
-    def __init__(self, n, s):
-        super().__init__(n, s)
+    def __init__(self, n, p, s):
+        super().__init__(n, p, s)
 
     def sm(self, x):
         return x
@@ -212,8 +230,9 @@ class Machine(hk.RNNCore):
     ):
         super().__init__(name=name)
         self.n = N.value
+        self.p = P.value
         self.s = MachineState(self.n)
-        self.i = InstructionSet(self.n, self.s)
+        self.i = InstructionSet(self.n, self.p, self.s)
         self.ni = self.i.ni
 
     def __call__(self, inputs, prev_state):
@@ -285,22 +304,24 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
-def code_for_mul(d, n):
+def code_for_mul(d, n, p):
     assert d > 0
     assert 2*(d-1)+1 <= n
-    code = jnp.zeros([n, len(INSTRUCTION_NAMES)])
+    names = get_instruction_names(n, p)
+    code = jnp.zeros([n, len(names)])
     for i in range(d-1):
-        code = code.at[(i,0)].set(1)
+        code = code.at[(i,0+p+1)].set(1)
     for i in range(d-1):
-        code = code.at[(i+d-1,1)].set(1)
+        code = code.at[(i+d-1,1+p+1)].set(1)
     for i in range(d-1+d-1,n):
-        code = code.at[(i,2)].set(1)
+        code = code.at[(i,2+p+1)].set(1)
     return code
 
 def train_data_inc(d):
     n = N.value
-    code = code_for_mul(d, n)
-    i = DiscreteInstructionSet(n, MachineState(n))
+    p = P.value
+    code = code_for_mul(d, n, p)
+    i = DiscreteInstructionSet(n, p, MachineState(n))
     r = []
     for j in range(N.value):
         data = jax.nn.one_hot(j, N.value)
@@ -340,7 +361,7 @@ def main(_):
 
     def header():
         print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
-        names = INSTRUCTION_NAMES
+        names = get_instruction_names(N.value, P.value)
         print([names[x]for x in to_discrete(state.params['machine']['code'])])
 
     header()
