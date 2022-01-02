@@ -20,7 +20,8 @@ import optax
 
 import itertools
 
-N = flags.DEFINE_integer('n', 7, 'uniformly, number of integers and number of lines of code')
+N = flags.DEFINE_integer('n', 7, 'number of integers')
+L = flags.DEFINE_integer('l', 8, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
@@ -40,19 +41,23 @@ ADD_BY_INC = [
 ]
 
 class InstructionSet:
-    def __init__(self, n, s):
+    def __init__(self, n, l, s):
         self.n = n
+        self.l = l
         self.s = s
         self.instruction_names = INSTRUCTION_NAMES
         self.instruction_map = INSTRUCTION_MAP
         self.ani = len(self.instruction_names)
-        assert self.ani <= self.n
-        self.ni = self.n # pad to be able to address each of the n lines of code
+        assert self.ani <= self.l
+        self.ni = self.l # pad to be able to address each of the l lines of code
         self.index_STOP = self.instruction_map['STOP']
-        self.stop_matrix = jnp.identity(self.n)
-        self.inc_matrix =  jnp.roll(jnp.identity(self.n), 1, axis=1)
-        self.dec_matrix = jnp.roll(jnp.identity(self.n), -1, axis=1)
         assert self.is_instr('STOP', self.index_STOP)
+
+    def inc_matrix(self, dim, shift=1):
+        return jnp.roll(jnp.identity(dim), shift, axis=1)
+
+    def dec_matrix(self, dim):
+        return self.inc_matrix(dim, -1)
 
     def get_instruction_name(self, index):
         if index < self.ani:
@@ -67,16 +72,16 @@ class InstructionSet:
         instr = self.get_instruction_name(i)
         if instr == 'STOP':
             return (reg_a, reg_b, pc)
-        next_pc = jnp.matmul(pc, self.inc_matrix)
+        next_pc = jnp.matmul(pc, self.inc_matrix(self.l))
         if instr == 'INC_B':
-            reg_b = jnp.matmul(reg_b, self.inc_matrix)
+            reg_b = jnp.matmul(reg_b, self.inc_matrix(self.n))
         elif instr == 'DEC_A':
-            reg_a = jnp.matmul(reg_a, self.dec_matrix)
+            reg_a = jnp.matmul(reg_a, self.dec_matrix(self.n))
         elif instr == 'JMP':
             next_pc = jnp.matmul(next_pc, code)
         elif instr == 'JMP0_A':
             p = jnp.dot(reg_a, jax.nn.one_hot(0, self.n))
-            next_pc = (1-p)*jnp.matmul(next_pc, self.inc_matrix) + p*jnp.matmul(next_pc, code)
+            next_pc = (1-p)*jnp.matmul(next_pc, self.inc_matrix(self.l)) + p*jnp.matmul(next_pc, code)
         else:
             assert instr == 'NOP'
         return (reg_a, reg_b, next_pc)
@@ -84,11 +89,11 @@ class InstructionSet:
     def step(self, code, state):
         (reg_a, reg_b, pc, halted) = self.s.unpack(state, self.sm)
         sel = jnp.zeros(self.ni)
-        for i in range(self.n):
+        for i in range(self.l):
             sel += pc[i] * self.sm(code[i])
         new_reg_a = jnp.zeros(self.n)
         new_reg_b = jnp.zeros(self.n)
-        new_pc = jnp.zeros(self.n)
+        new_pc = jnp.zeros(self.l)
         for i in range(self.ni):
             (delta_reg_a, delta_reg_b, delta_pc) = self.execute_instr(code, i, reg_a, reg_b, pc)
             new_reg_a += sel[i] * delta_reg_a
@@ -108,41 +113,42 @@ class InstructionSet:
 
     def program_to_one_hot(self, program):
         np = len(program)
-        assert np <= self.n
+        assert np <= self.l
         p = [self.instruction_map.get(word, word) for word in program]
-        for i in range(np, self.n):
+        for i in range(np, self.l):
             p.append(self.index_STOP)
-        r = jax.nn.one_hot(p, self.n)
+        r = jax.nn.one_hot(p, self.l)
         return r
 
     def discrete_code(self, code):
         program = []
         index = 0
-        while index < self.n:
+        while index < self.l:
             w = to_discrete_item(code[index])
             word = self.get_instruction_name(w)
             program.append(word)
             index += 1
-            if word.startswith('JMP') and index < self.n:
+            if word.startswith('JMP') and index < self.l:
                 w = to_discrete_item(code[index])
                 program.append(w)
                 index += 1
         return program
 
 class DiscreteInstructionSet(InstructionSet):
-    def __init__(self, n, s):
-        super().__init__(n, s)
+    def __init__(self, n, l, s):
+        super().__init__(n, l, s)
 
     def sm(self, x):
         return x
 
 class MachineState:
-    def __init__(self, n):
+    def __init__(self, n, l):
         self.n = n
-        self.total = 3*self.n+2
+        self.l = l
+        self.total = 2*self.n+self.l+2
 
     def initial(self, reg_a, reg_b):
-        pc = jnp.zeros([self.n]).at[0].set(1)
+        pc = jnp.zeros([self.l]).at[0].set(1)
         halted = jnp.array([0, 1])
         state = self.pack(reg_a, reg_b, pc, halted)
         return state
@@ -165,10 +171,10 @@ class MachineState:
         return state[self.n:2*self.n]
 
     def pc(self, state):
-        return state[2*self.n:3*self.n]
+        return state[2*self.n:2*self.n+self.l]
 
     def halted(self, state):
-        return state[3*self.n:3*self.n+2]
+        return state[2*self.n+self.l:2*self.n+self.l+2]
 
     def mask(self, state):
         return state
@@ -193,8 +199,9 @@ class Machine(hk.RNNCore):
     ):
         super().__init__(name=name)
         self.n = N.value
-        self.s = MachineState(self.n)
-        self.i = InstructionSet(self.n, self.s)
+        self.l = L.value
+        self.s = MachineState(self.n, self.l)
+        self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
 
     def __call__(self, inputs, prev_state):
@@ -211,11 +218,11 @@ class Machine(hk.RNNCore):
         return self.i.step(code, state)
 
     def get_code(self):
-        return hk.get_parameter('code', [self.n, self.ni], init=self.make_code_fun())
+        return hk.get_parameter('code', [self.l, self.ni], init=self.make_code_fun())
 
     def make_code_fun(self):
         # all STOPs
-        code = jnp.array([[1.0 if self.i.is_instr('STOP', i) else 0.0 for i in range(self.ni)] for l in range(self.n)])
+        code = jnp.array([[1.0 if self.i.is_instr('STOP', i) else 0.0 for i in range(self.ni)] for l in range(self.l)])
 
         def code_fun(shape, dtype):
             return code
@@ -241,7 +248,7 @@ def forward(input) -> jnp.ndarray:
   return states
 
 def mask_each(xs):
-    i = MachineState(N.value)
+    i = MachineState(N.value, L.value)
     return jnp.array([i.mask(x) for x in xs])
 
 def sequence_loss(t) -> jnp.ndarray:
@@ -264,8 +271,9 @@ def update(state: TrainingState, t) -> TrainingState:
 
 def train_data_inc():
     n = N.value
+    l = L.value
     program = ADD_BY_INC
-    i = DiscreteInstructionSet(n, MachineState(n))
+    i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE for training')
     print(i.discrete_code(code))
@@ -316,7 +324,7 @@ def main(_):
         t = next(train_data)
         state = update(state, t)
 
-    iset = InstructionSet(N.value, MachineState(N.value))
+    iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
     def header():
         print('MACHINE CODE learnt')
         print(iset.discrete_code(state.params['machine']['code']))
