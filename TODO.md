@@ -7,7 +7,7 @@ Next steps (TODOs)
   - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
   - [ ] Could implement sketches like ∂4.
 - [ ] Add batching.
-- [ ] Write proper tests.
+- [ ] Debug order of training samples.
 
 ## Log
 
@@ -47,5 +47,7 @@ Next steps (TODOs)
   - [x] A language with two registers (`A` and `B`) for defining addition by repeated incrementation.
 
 - [x] Separate flags for number of integers and lines of code.
+
+- [x] Wrote assertions to stand for tests.
 
 - [ ] Unroll the number of steps according to the computation.
