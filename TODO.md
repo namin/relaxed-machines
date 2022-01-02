@@ -5,9 +5,9 @@ Next steps (TODOs)
 
   - [ ] A language with two registers (`A` and `B`) for defining addition by repeated increments.
 
-Initially: `RA=n`, `RB=m`
+Initially: `A=n`, `B=m`
 
-Finally: `RA=0`, `RB=m+n`
+Finally: `A=0`, `B=m+n`
 
 Code:
 ```
