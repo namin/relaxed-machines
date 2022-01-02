@@ -29,7 +29,7 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-INSTRUCTION_NAMES = ['INC_B', 'DEC_A', 'JMP0_A', 'JMP', 'STOP']
+INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -48,7 +48,8 @@ class InstructionSet:
         self.instruction_names = INSTRUCTION_NAMES
         self.instruction_map = INSTRUCTION_MAP
         self.ani = len(self.instruction_names)
-        assert self.ani <= self.l
+        self.ni = self.ani
+        assert self.ni <= self.l, f"number of instructions ({self.ni}) should be <= number of lines of code ({self.l})"
         self.ni = self.l # pad to be able to address each of the l lines of code
         self.index_STOP = self.instruction_map['STOP']
         assert self.is_instr('STOP', self.index_STOP)
@@ -73,17 +74,23 @@ class InstructionSet:
         if instr == 'STOP':
             return (reg_a, reg_b, pc)
         next_pc = jnp.matmul(pc, self.inc_matrix(self.l))
-        if instr == 'INC_B':
+        if instr == 'INC_A':
+            reg_a = jnp.matmul(reg_a, self.inc_matrix(self.n))
+        elif instr == 'INC_B':
             reg_b = jnp.matmul(reg_b, self.inc_matrix(self.n))
         elif instr == 'DEC_A':
             reg_a = jnp.matmul(reg_a, self.dec_matrix(self.n))
+        elif instr == 'DEC_B':
+            reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
         elif instr == 'JMP':
             next_pc = jnp.matmul(next_pc, code)
-        elif instr == 'JMP0_A':
-            p = jnp.dot(reg_a, jax.nn.one_hot(0, self.n))
+        elif instr.startswith('JMP0_'):
+            assert instr == 'JMP0_A' or instr == 'JMP0_B'
+            reg = reg_a if instr[-1] == 'A' else reg_b
+            p = jnp.dot(reg, jax.nn.one_hot(0, self.n))
             next_pc = (1-p)*jnp.matmul(next_pc, self.inc_matrix(self.l)) + p*jnp.matmul(next_pc, code)
         else:
-            assert instr == 'NOP'
+            assert instr == 'NOP', f"Unhandled instruction {instr}"
         return (reg_a, reg_b, next_pc)
 
     def step(self, code, state):
