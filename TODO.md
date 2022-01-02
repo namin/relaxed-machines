@@ -1,23 +1,6 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Flesh out a machine with labels and branching.
-
-  - [ ] A language with two registers (`A` and `B`) for defining addition by repeated increments.
-
-Initially: `A=n`, `B=m`
-
-Finally: `A=0`, `B=m+n`
-
-Code:
-```
-0 JMP0_A 6
-2 INC_B
-3 DEC_A
-4 JMP 0
-6 STOP
-```
-
 - [ ] Flesh out a machine with subroutines.
 - [ ] Define sketches.
   - [ ] Could implement a "soft" sketch as initialization.
@@ -59,3 +42,9 @@ Code:
       Then, the machine needs the whole state, including the dirty bits due to popping.
       
 - [ ] Would it help to penalize stack underflow?
+
+### ['asm'](asm.py)
+
+- [x] Flesh out a machine with labels and branching.
+
+  - [x] A language with two registers (`A` and `B`) for defining addition by repeated incrementation.

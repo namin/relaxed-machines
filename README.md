@@ -6,6 +6,7 @@ Explorations in neuro-symbolic differentiable interpreters.
 Baby steps (see the [log](TODO.md#log)):
 1. [`inc_stop`](inc_stop.py)
 2. [`dup_add`](dup_add.py)
+3. [`asm`](asm.py)
 
 ## Libraries
 - [JAX](https://github.com/google/jax)

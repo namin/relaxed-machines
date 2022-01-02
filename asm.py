@@ -1,15 +1,8 @@
-"""A differentiable machine that understands `DUP`, `ADD`, `STOP`.
-
-The state of the machine comprises a data stack, a program counter and whether the machine has halted.
+"""A differentiable machine with two registers and conditional and unconditional jumping.
 
 The parameters of the machine are the lines of code.
 
-The learning task is to learn a linear function,
-that is f(x)=(a*x+b) % n.
-For n=5, a=2, b=0, we generate the examples
-f(0) = 0, f(1) = 2, f(2) = 4, f(3) = 1, f(4) = 3
-and the machine learns the program
-DUP, ADD, STOP, *
+The learning task is to learn addition by repeated incrementation.
 """
 
 from typing import Any, NamedTuple, Optional
