@@ -43,11 +43,10 @@ Next steps (TODOs)
       
 - [ ] Would it help to penalize stack underflow?
 
-### ['asm'](asm.py)
+### [`reg_jmp`](reg_jmp.py)
 
 - [x] Flesh out a machine with labels and branching.
 
   - [x] A language with two registers (`A` and `B`) for defining addition by repeated incrementation.
 
 - [ ] Unroll the number of steps according to the computation.
-
