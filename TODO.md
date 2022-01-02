@@ -35,11 +35,11 @@ Next steps (TODOs)
 
 - [x] Implemented instructions `STOP`, `DUP`, `ADD` and learning task to multiply by a constant.
 
+- [x] Add instruction to push integer.
+
 - [ ] The machine only learns well when giving it the data top of stack and pointer at each step.
       Feels like cheating.
-      Even with that, the machine does not learn well at higher `d`s and `n`s. For example, `--d 4 --n 16`.
+      Even with that, the machine does not learn well at higher `a`s and `n`s. For example, `--a 4 --n 16`.
       Then, the machine needs the whole state, including the dirty bits due to popping.
       
 - [ ] Would it help to penalize stack underflow?
-
-- [ ] Add instruction to push integer.
