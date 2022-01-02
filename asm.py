@@ -61,25 +61,23 @@ class InstructionSet:
     def is_instr(self, name, index):
         return self.get_instruction_name(index) == name
 
-    def execute_instr(self, i, data_p, data, pc):
-        #if self.is_instr('STOP', i):
-        return (data_p, data, pc)
-        '''
+    def execute_instr(self, code, i, reg_a, reg_b, pc):
+        instr = self.get_instruction_name(i)
+        if instr == 'STOP':
+            return (reg_a, reg_b, pc)
         next_pc = jnp.matmul(pc, self.inc_matrix)
-        if self.is_instr('DUP', i):
-            data_value = self.s.read_value(data_p, data)
-            (next_data_p, next_data) = self.push(data_p, data, data_value)
-            return (next_data_p, next_data, next_pc)
-        elif self.is_instr('ADD', i):
-            (data_p, data, n1) = self.pop(data_p, data)
-            (data_p, data, n2) = self.pop(data_p, data)
-            nr = self.add(n1, n2)
-            (data_p, data) = self.push(data_p, data, nr)
-            return (data_p, data, next_pc)
-        elif self.is_push_instr(i):
-            (data_p, data) = self.push(data_p, data, self.push_instr_num(i))
-            return (data_p, data, next_pc)
-        # let an error be...'''
+        if instr == 'INC_B':
+            reg_b = jnp.matmul(reg_b, self.inc_matrix)
+        elif instr == 'DEC_A':
+            reg_a = jnp.matmul(reg_a, self.dec_matrix)
+        elif instr == 'JMP':
+            next_pc = jnp.matmul(next_pc, code)
+        elif instr == 'JMP0_A':
+            p = jnp.dot(reg_a, jax.nn.one_hot(0, self.n))
+            next_pc = (1-p)*next_pc + p*jnp.matmul(next_pc, code)
+        else:
+            assert instr == 'NOP'
+        return (reg_a, reg_b, next_pc)
 
     def step(self, code, state):
         (reg_a, reg_b, pc, halted) = self.s.unpack(state, self.sm)
@@ -90,7 +88,7 @@ class InstructionSet:
         new_reg_b = jnp.zeros(self.n)
         new_pc = jnp.zeros(self.n)
         for i in range(self.ni):
-            (delta_reg_a, delta_reg_b, delta_pc) = self.execute_instr(i, reg_a, reg_b, pc)
+            (delta_reg_a, delta_reg_b, delta_pc) = self.execute_instr(code, i, reg_a, reg_b, pc)
             new_reg_a += sel[i] * delta_reg_a
             new_reg_b += sel[i] * delta_reg_b
             new_pc += sel[i] * delta_pc
