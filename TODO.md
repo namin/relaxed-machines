@@ -46,6 +46,6 @@ Next steps (TODOs)
 
   - [x] A language with two registers (`A` and `B`) for defining addition by repeated incrementation.
 
-- [x] Separate numbers for number of integers and lines of code.
+- [x] Separate flags for number of integers and lines of code.
 
 - [ ] Unroll the number of steps according to the computation.
