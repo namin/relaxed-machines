@@ -4,9 +4,9 @@ The state of the machine comprises a data stack, a program counter and whether t
 
 The parameters of the machine are the lines of code.
 
-The learning task is to learn multiplication by d modulo n,
-that is f(x)=(x*d) % n.
-For n=5 and  d=2, we generate the examples
+The learning task is to learn a linear function,
+that is f(x)=(a*x+b) % n.
+For n=5, a=2, b=0, we generate the examples
 f(0) = 0, f(1) = 2, f(2) = 4, f(3) = 1, f(4) = 3
 and the machine learns the program
 DUP, ADD, STOP, *
@@ -28,7 +28,8 @@ import optax
 import itertools
 
 N = flags.DEFINE_integer('n', 5, 'uniformly, number of integers, number of lines of code and of data stack size')
-D = flags.DEFINE_integer('d', 2, 'learn f(x)=(x*d)%n')
+A = flags.DEFINE_integer('a', 2, 'learn f(x)=(a*x+b)%n')
+B = flags.DEFINE_integer('b', 0, 'learn f(x)=(a*x+b)%n')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 P = flags.DEFINE_integer('p', -1, 'push instruction for each constant from 0 to argument')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
@@ -40,7 +41,7 @@ def get_instruction_names(n, p):
     assert p <= n
     names = []
     if p>=0:
-        names.extend([str(i) for i in range(p)])
+        names.extend([str(i) for i in range(p+1)])
     names.extend(['DUP', 'ADD', 'STOP'])
     return names
 
@@ -62,7 +63,7 @@ class InstructionSet:
         return jax.nn.one_hot(i, self.n)
 
     def is_push_instr(self, index):
-        return self.p>=0 and index < self.p
+        return self.p>=0 and index <= self.p
 
     def is_instr(self, name, index):
         return self.instruction_names[index] == name
@@ -304,23 +305,36 @@ def update(state: TrainingState, t) -> TrainingState:
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
 
-def code_for_mul(d, n, p):
-    assert d > 0
-    assert 2*(d-1)+1 <= n
+def code_for_lin(a, b, n, p):
+    assert a > 0
+    assert 2*(a-1)+1 + (2 if b>0 else 0) <= n
+    assert p >= -1
     names = get_instruction_names(n, p)
+    DUP_INDEX = 0+p+1
+    ADD_INDEX = 1+p+1
+    STOP_INDEX = 2+p+1
     code = jnp.zeros([n, len(names)])
-    for i in range(d-1):
-        code = code.at[(i,0+p+1)].set(1)
-    for i in range(d-1):
-        code = code.at[(i+d-1,1+p+1)].set(1)
-    for i in range(d-1+d-1,n):
-        code = code.at[(i,2+p+1)].set(1)
+    for i in range(a-1):
+        code = code.at[(i,DUP_INDEX)].set(1)
+    for i in range(a-1):
+        code = code.at[(i+a-1,ADD_INDEX)].set(1)
+    next = a-1+a-1
+    if b>0:
+        assert p > b
+        code = code.at[(next, b)].set(1)
+        next += 1
+        code = code.at[(next, ADD_INDEX)].set(1)
+        next += 1
+    for i in range(next,n):
+        code = code.at[(i,STOP_INDEX)].set(1)
     return code
 
-def train_data_inc(d):
+def train_data_inc(a, b):
     n = N.value
     p = P.value
-    code = code_for_mul(d, n, p)
+    code = code_for_lin(a, b, n, p)
+    print('MACHINE CODE for training')
+    print(discrete_code(code))
     i = DiscreteInstructionSet(n, p, MachineState(n))
     r = []
     for j in range(N.value):
@@ -340,10 +354,14 @@ def to_discrete_item(x):
 def to_discrete(a):
     return [to_discrete_item(x) for x in a]
 
+def discrete_code(code):
+    names = get_instruction_names(N.value, P.value)
+    return [names[x]for x in to_discrete(code)]
+
 def main(_):
     #flags.FLAGS([""])
 
-    train_data = itertools.cycle(train_data_inc(D.value))
+    train_data = itertools.cycle(train_data_inc(A.value, B.value))
 
     params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
     opt_init, _ = make_optimizer()
@@ -360,9 +378,8 @@ def main(_):
         state = update(state, t)
 
     def header():
-        print('MACHINE CODE', 'for learning f(x)=(x*%d)%%%d' % (D.value, N.value))
-        names = get_instruction_names(N.value, P.value)
-        print([names[x]for x in to_discrete(state.params['machine']['code'])])
+        print('MACHINE CODE learnt')
+        print(discrete_code(state.params['machine']['code']))
 
     header()
     s = MachineState(N.value)
