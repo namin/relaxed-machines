@@ -277,6 +277,8 @@ def check_add_by_inc(i, inp, fin):
     (res_a, res_b, res_pc, res_halted) = i.s.unpack(state)
     d_a = to_discrete_item(res_a)
     d_b = to_discrete_item(res_b)
+    d_halted = to_discrete_item(res_halted)
+    assert d_halted == 0 # means halted...
     assert d_a == 0
     assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
 
