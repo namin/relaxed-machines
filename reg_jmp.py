@@ -29,6 +29,8 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
+DO_HARD_SKETCH = flags.DEFINE_boolean('hard_sketch', True, 'whether to use a hard sketch')
+
 INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
@@ -233,7 +235,6 @@ class MachineState:
 class Machine(hk.RNNCore):
     def __init__(
             self,
-            hard_sketch,
             name: Optional[str] = None
     ):
         super().__init__(name=name)
@@ -242,7 +243,10 @@ class Machine(hk.RNNCore):
         self.s = MachineState(self.n, self.l)
         self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
-        self.hard_sketch = hard_sketch
+        if DO_HARD_SKETCH.value:
+            self.hard_sketch = ADD_BY_INC_SKETCH
+        else:
+            self.hard_sketch = self.i.empty_sketch()
         self.init_hard_sketch()
 
     def __call__(self, inputs, prev_state):
@@ -283,8 +287,8 @@ class TrainingState(NamedTuple):
   params: hk.Params
   opt_state: optax.OptState
 
-def make_network(hard_sketch) -> Machine:
-    model = Machine(hard_sketch)
+def make_network() -> Machine:
+    model = Machine()
     return model
 
 def make_optimizer() -> optax.GradientTransformation:
@@ -292,7 +296,7 @@ def make_optimizer() -> optax.GradientTransformation:
   return optax.adam(LEARNING_RATE.value)
 
 def forward(input) -> jnp.ndarray:
-  core = make_network(ADD_BY_INC_SKETCH)
+  core = make_network()
   sequence_length = S.value
   initial_state = core.initial_state(input, batch_size=None)
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(sequence_length) for i in range(sequence_length)], initial_state)
@@ -395,7 +399,10 @@ def main(_):
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
     holes = state.params['machine']['code']
-    learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
+    if DO_HARD_SKETCH.value:
+        learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
+    else:
+        learnt_program = iset.discrete_code(holes)
     def header():
         print('MACHINE CODE learnt')
         print(learnt_program)
