@@ -26,11 +26,13 @@ M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 22, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
-TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
+TRAINING_STEPS = flags.DEFINE_integer('training_steps', 110000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-DO_HARD_SKETCH = flags.DEFINE_boolean('hard_sketch', True, 'whether to use a hard sketch')
-DO_HARD_SKETCH_NO_JMP = flags.DEFINE_boolean('hard_sketch_no_jmp', False, 'whether to use a hard sketch that leaves holes for the jumps')
+HARD_SKETCH = flags.DEFINE_boolean('hard', False, 'whether to use a hard sketch: only parameters for holes')
+SOFT_SKETCH = flags.DEFINE_boolean('soft', False, 'whether to use a soft sketch: initial state, full parameters')
+SKETCH = flags.DEFINE_boolean('sketch', False, 'whether to sketch')
+SKETCH_NO_JMP = flags.DEFINE_boolean('sketch_no_jmp', False, 'whether to use a hard sketch that leaves holes for the jumps')
 MASK_A = flags.DEFINE_boolean('mask_a', False, 'whether to mask A')
 MASK_B = flags.DEFINE_boolean('mask_b', False, 'whether to mask B')
 MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
@@ -165,6 +167,10 @@ class InstructionSet:
         assert hole_index == n_holes
         return program
 
+    def sketch_to_one_hot(self, sketch):
+        program = [word if word != 'HOLE' else 'NOP' for word in sketch]
+        return self.program_to_one_hot(program)
+
     def program_to_one_hot(self, program):
         np = len(program)
         assert np <= self.l
@@ -214,7 +220,6 @@ class MachineState:
         halted = fn(self.halted(state))
         return (reg_a, reg_b, pc, halted)
 
-
     def pack(self, reg_a, reg_b, pc, halted):
         return jnp.concatenate((reg_a, reg_b, pc, halted))
 
@@ -241,6 +246,7 @@ class MachineState:
             mask.append(pc)
         if not MASK_HALTED.value:
             mask.append(halted)
+        # weird: packing and unpacking the state degrades learning!
         return jnp.concatenate(mask)
 
     def print(self, state):
@@ -267,10 +273,11 @@ class Machine(hk.RNNCore):
         self.s = MachineState(self.n, self.l)
         self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
-        if DO_HARD_SKETCH_NO_JMP.value:
-            self.hard_sketch = ADD_BY_INC_SKETCH_NO_JMP
-        elif DO_HARD_SKETCH.value:
-            self.hard_sketch = ADD_BY_INC_SKETCH
+        if HARD_SKETCH.value:
+            if SKETCH_NO_JMP.value:
+                self.hard_sketch = ADD_BY_INC_SKETCH_NO_JMP
+            else:
+                self.hard_sketch = ADD_BY_INC_SKETCH
         else:
             self.hard_sketch = self.i.empty_sketch()
         self.init_hard_sketch()
@@ -280,8 +287,7 @@ class Machine(hk.RNNCore):
         return new_state, new_state
 
     def init_hard_sketch(self):
-        self.sketch_program = [word if word != 'HOLE' else 'NOP' for word in self.hard_sketch]
-        self.hard_sketch_code = self.i.program_to_one_hot(self.sketch_program)
+        self.hard_sketch_code = self.i.sketch_to_one_hot(self.hard_sketch)
         self.hole_indices = [i for (i, word) in enumerate(self.hard_sketch) if word == 'HOLE']
         self.n_holes = len(self.hole_indices)
 
@@ -302,8 +308,18 @@ class Machine(hk.RNNCore):
         return code
 
     def make_code_fun(self):
-        # all holes are initialized to NOPs
-        code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.n_holes)])
+        if SOFT_SKETCH.value:
+            assert not HARD_SKETCH.value, "not yet supported"
+            if SKETCH_NO_JMP.value:
+                code = self.i.sketch_to_one_hot(ADD_BY_INC_SKETCH_NO_JMP)
+            elif SKETCH.value:
+                code = self.i.sketch_to_one_hot(ADD_BY_INC_SKETCH)
+            else:
+                # we initialize to the whole program... a bit silly, but to try out
+                code = self.i.sletch_to_one_hot(ADD_BY_INC)
+        else:
+            # all holes are initialized to NOPs
+            code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.n_holes)])
 
         def code_fun(shape, dtype):
             return code
@@ -428,12 +444,16 @@ def main(_):
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
     holes = state.params['machine']['code']
-    if DO_HARD_SKETCH_NO_JMP.value:
-        learnt_program = iset.fill_program(ADD_BY_INC_SKETCH_NO_JMP, holes)
-    elif DO_HARD_SKETCH.value:
-        learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
+    if HARD_SKETCH.value:
+        if SKETCH_NO_JMP.value:
+            learnt_program = iset.fill_program(ADD_BY_INC_SKETCH_NO_JMP, holes)
+        elif SKETCH.value:
+            learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
+        else:
+            learnt_program = iset.discrete_code(holes)
     else:
         learnt_program = iset.discrete_code(holes)
+
     def header():
         print('MACHINE CODE learnt')
         print(learnt_program)
