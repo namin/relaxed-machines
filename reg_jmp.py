@@ -470,9 +470,13 @@ def main(_):
         print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
         halted = False
         for j, st in enumerate(states):
+            new_halted  = to_discrete_item(iset.s.halted(st)) == 0
             if not halted:
                 iset.s.print(st)
-                halted = to_discrete_item(iset.s.halted(st)) == 0
+            else:
+                assert halted == new_halted
+            halted = new_halted
+
     header()
 
 if __name__ == '__main__':
