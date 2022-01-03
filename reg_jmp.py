@@ -30,6 +30,7 @@ TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 DO_HARD_SKETCH = flags.DEFINE_boolean('hard_sketch', True, 'whether to use a hard sketch')
+DO_HARD_SKETCH_NO_JMP = flags.DEFINE_boolean('hard_sketch_no_jmp', False, 'whether to use a hard sketch that leaves holes for the jumps')
 DO_MASK = flags.DEFINE_boolean('mask', True, 'whether to apply a mask')
 DO_MASK_A = flags.DEFINE_boolean('mask_a', False, 'whether to also mask A')
 
@@ -49,6 +50,14 @@ ADD_BY_INC_SKETCH = [
     'HOLE',#'INC_B',
     'HOLE',#'DEC_A',
     'JMP', 0,
+    'STOP'
+]
+
+ADD_BY_INC_SKETCH_NO_JMP = [
+    'HOLE', 'HOLE',#'JMP0_A', 6,
+    'INC_B',
+    'DEC_A',
+    'HOLE', 'HOLE',#'JMP', 0,
     'STOP'
 ]
 
@@ -253,7 +262,9 @@ class Machine(hk.RNNCore):
         self.s = MachineState(self.n, self.l)
         self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
-        if DO_HARD_SKETCH.value:
+        if DO_HARD_SKETCH_NO_JMP.value:
+            self.hard_sketch = ADD_BY_INC_SKETCH_NO_JMP
+        elif DO_HARD_SKETCH.value:
             self.hard_sketch = ADD_BY_INC_SKETCH
         else:
             self.hard_sketch = self.i.empty_sketch()
@@ -409,7 +420,9 @@ def main(_):
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
     holes = state.params['machine']['code']
-    if DO_HARD_SKETCH.value:
+    if DO_HARD_SKETCH_NO_JMP.value:
+        learnt_program = iset.fill_program(ADD_BY_INC_SKETCH_NO_JMP, holes)
+    elif DO_HARD_SKETCH.value:
         learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
     else:
         learnt_program = iset.discrete_code(holes)
