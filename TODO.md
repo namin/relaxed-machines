@@ -2,10 +2,7 @@ Next steps (TODOs)
 ----------
 
 - [ ] Flesh out a machine with subroutines.
-- [ ] Define sketches.
-  - [ ] Could implement a "soft" sketch as initialization.
-  - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
-  - [ ] Could implement sketches like ∂4.
+- [ ] Implement sketches like ∂4.
 - [ ] Add batching.
 - [ ] Debug order of training samples.
 
@@ -49,5 +46,9 @@ Next steps (TODOs)
 - [x] Separate flags for number of integers and lines of code.
 
 - [x] Wrote assertions to stand for tests.
+
+- [ ] Define sketches.
+  - [ ] Could implement a "soft" sketch as initialization.
+  - [ ] Could implement a "hard" sketch by restricting code parameters to holes.
 
 - [ ] Unroll the number of steps according to the computation.
