@@ -468,8 +468,11 @@ def main(_):
         states = forward_fn(state.params, inp)
         check_add_by_inc(iset, inp, states[-1])
         print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
+        halted = False
         for j, st in enumerate(states):
-            iset.s.print(st)
+            if not halted:
+                iset.s.print(st)
+                halted = to_discrete_item(iset.s.halted(st)) == 0
     header()
 
 if __name__ == '__main__':
