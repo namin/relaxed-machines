@@ -35,6 +35,7 @@ MASK_A = flags.DEFINE_boolean('mask_a', False, 'whether to mask A')
 MASK_B = flags.DEFINE_boolean('mask_b', False, 'whether to mask B')
 MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
+FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
 INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
@@ -336,6 +337,9 @@ def sequence_loss(t) -> jnp.ndarray:
   states = mask_each(forward(t['input']))
   log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
   one_hot_labels = mask_each(t['target'])
+  if FINAL.value:
+      one_hot_labels = one_hot_labels[-1]
+      log_probs = log_probs[-1]
   loss = -jnp.sum(one_hot_labels * log_probs) / N.value
   return loss
 
