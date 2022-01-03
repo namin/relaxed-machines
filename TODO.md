@@ -59,6 +59,6 @@ Next steps (TODOs)
       the machine learns
       ```['JMP0_A', 6, 'INC_B', 'DEC_A', 'JMP0_A', 1, 'STOP']```
       which is correct, and even slightly more efficient (in terms of number of steps).
-      Oddly, this happens when using a full mask vs the state, which shouldn't make a difference.
+      Weirdly, this happens when using a full mask vs the state, which shouldn't make a difference.
 
 - [ ] Unroll the number of steps according to the computation.
