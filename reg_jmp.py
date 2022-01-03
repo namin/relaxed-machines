@@ -31,6 +31,7 @@ SEED = flags.DEFINE_integer('seed', 42, '')
 
 DO_HARD_SKETCH = flags.DEFINE_boolean('hard_sketch', True, 'whether to use a hard sketch')
 DO_MASK = flags.DEFINE_boolean('mask', True, 'whether to apply a mask')
+DO_MASK_A = flags.DEFINE_boolean('mask_a', False, 'whether to also mask A')
 
 INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
@@ -219,9 +220,12 @@ class MachineState:
 
     def mask(self, state):
         if DO_MASK.value:
-            reg_a = self.reg_a(state)
             reg_b = self.reg_b(state)
-            return jnp.concatenate((reg_a, reg_b))
+            if DO_MASK_A.value:
+                return reg_b
+            else:
+                reg_a = self.reg_a(state)
+                return jnp.concatenate((reg_a, reg_b))
         else:
             return state
 
