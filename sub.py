@@ -39,7 +39,7 @@ MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
-INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -123,7 +123,7 @@ class InstructionSet:
         return (reg_a, reg_b, next_pc)
 
     def step(self, code, state):
-        (reg_a, reg_b, pc, halted) = self.s.unpack(state, self.sm)
+        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.s.unpack(state, self.sm)
         sel = jnp.zeros(self.ni)
         for i in range(self.l):
             sel += pc[i] * self.sm(code[i])
@@ -209,10 +209,39 @@ class MachineState:
         self.l = l
         self.total = 2*self.n+self.l+2
 
+    def read_value(self, p, buffer):
+        return jnp.matmul(p.T, buffer).T
+
+    def write_value(self, p, buffer, value):
+        old = jnp.outer(p, jnp.ones(self.n)) * buffer
+        new = jnp.outer(p, value)
+        return data - old + new
+
+    def over_buffer(self, buffer, fn):
+        # TODO: can we use a tree_map?
+        for i in range(self.n):
+            buffer = buffer.at[i].set(fn(buffer[i]))
+        return buffer
+
+    def to_buffer(self, line):
+        return jnp.reshape(line, [self.n, self.n])
+
+    def pack_buffer(self, buffer):
+        return jnp.reshape(buffer, self.n*self.n)
+
+    def new_stack(self):
+        p = jnp.zeros(self.n).at[0].set(1)
+        buffer = jnp.zeros([self.n, self.n])
+        for i in range(self.n):
+            buffer = buffer.at[(i,0)].set(1)
+        return (p, buffer)
+
     def initial(self, reg_a, reg_b):
         pc = jnp.zeros([self.l]).at[0].set(1)
         halted = jnp.array([0, 1])
-        state = self.pack(reg_a, reg_b, pc, halted)
+        (data_p, data) = self.new_stack()
+        (ret_p, ret) = self.new_stack()
+        state = self.pack(reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
         return state
 
     def unpack(self, state, fn=lambda x: x):
@@ -220,10 +249,14 @@ class MachineState:
         reg_b = fn(self.reg_b(state))
         pc = fn(self.pc(state))
         halted = fn(self.halted(state))
-        return (reg_a, reg_b, pc, halted)
+        data_p = fn(self.data_p(state))
+        data = self.over_buffer(self.data(state), fn)
+        ret_p = fn(self.ret_p(state))
+        ret = self.over_buffer(self.ret(state), fn)
+        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
-    def pack(self, reg_a, reg_b, pc, halted):
-        return jnp.concatenate((reg_a, reg_b, pc, halted))
+    def pack(self, reg_a, reg_b, pc, halted, data_p, data, ret_p, ret):
+        return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data), ret_p, self.pack_buffer(ret)))
 
     def reg_a(self, state):
         return state[0:self.n]
@@ -237,8 +270,20 @@ class MachineState:
     def halted(self, state):
         return state[2*self.n+self.l:2*self.n+self.l+2]
 
+    def data_p(self, state):
+        return state[2*self.n+self.l+2:3*self.n+self.l+2]
+
+    def data(self, state):
+        return self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n])
+
+    def ret_p(self, state):
+        return state[3*self.n+self.l+2+self.n*self.n:4*self.n+self.l+2+self.n*self.n]
+
+    def ret(self, state):
+        return self.to_buffer(state[4*self.n+self.l+2+self.n*self.n:4*self.n+self.l+2+2*self.n*self.n])
+
     def mask(self, state):
-        (reg_a, reg_b, pc, halted) = self.unpack(state)
+        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.unpack(state)
         mask = []
         if not MASK_A.value:
             mask.append(reg_a)
@@ -248,7 +293,6 @@ class MachineState:
             mask.append(pc)
         if not MASK_HALTED.value:
             mask.append(halted)
-        # weird: packing and unpacking the state degrades learning!
         return jnp.concatenate(mask)
 
     def print(self, state):
