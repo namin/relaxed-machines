@@ -21,7 +21,7 @@ import optax
 import itertools
 
 N = flags.DEFINE_integer('n', 3, 'number of integers')
-L = flags.DEFINE_integer('l', 8, 'number of lines of code')
+L = flags.DEFINE_integer('l', 9, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 22, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
@@ -29,7 +29,7 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'STOP']
+INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -51,6 +51,7 @@ class InstructionSet:
         self.ni = self.ani
         assert self.ni <= self.l, f"number of instructions ({self.ni}) should be <= number of lines of code ({self.l})"
         self.ni = self.l # pad to be able to address each of the l lines of code
+        self.index_NOP = self.instruction_map['NOP']
         self.index_STOP = self.instruction_map['STOP']
         assert self.is_instr('STOP', self.index_STOP)
 
@@ -210,10 +211,22 @@ class Machine(hk.RNNCore):
         self.s = MachineState(self.n, self.l)
         self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
+        self.hard_sketch = ['HOLE' for i in range(self.l)]
+        self.init_hard_sketch()
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
         return new_state, new_state
+
+    def set_hard_sketch(self, hard_sketch):
+        self.hard_sketch = hard_sketch
+        self.init_hard_sketch()
+
+    def init_hard_sketch(self):
+        self.sketch_program = [word if word != 'HOLE' else 'NOP' for word in self.hard_sketch]
+        self.hard_sketch_code = self.i.program_to_one_hot(self.sketch_program)
+        self.hole_indices = [i for (i, word) in enumerate(self.hard_sketch) if word == 'HOLE']
+        self.n_holes = len(self.hole_indices)
 
     def initial_state(self, regs, batch_size: Optional[int]):
         assert batch_size is None
@@ -225,11 +238,15 @@ class Machine(hk.RNNCore):
         return self.i.step(code, state)
 
     def get_code(self):
-        return hk.get_parameter('code', [self.l, self.ni], init=self.make_code_fun())
+        holes = hk.get_parameter('code', [self.n_holes, self.ni], init=self.make_code_fun())
+        code = self.hard_sketch_code
+        for i in range(self.n_holes):
+            code = code.at[self.hole_indices[i]].set(holes[i])
+        return code
 
     def make_code_fun(self):
-        # all STOPs
-        code = jnp.array([[1.0 if self.i.is_instr('STOP', i) else 0.0 for i in range(self.ni)] for l in range(self.l)])
+        # all holes are initialized to NOPs
+        code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.l)])
 
         def code_fun(shape, dtype):
             return code
