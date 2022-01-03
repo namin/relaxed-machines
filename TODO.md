@@ -51,6 +51,7 @@ Next steps (TODOs)
   - [ ] Could implement a "soft" sketch as initialization.
   - [x] Could implement a "hard" sketch by restricting code parameters to holes.
         
-    - [ ] Does not seem to help reduce training steps. Find out if masking behaves better.
+    - [x] By itself, a hard sketch does not seem to help reduce training steps.
+          However, maskign is now possible!
 
 - [ ] Unroll the number of steps according to the computation.
