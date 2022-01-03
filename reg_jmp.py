@@ -40,6 +40,14 @@ ADD_BY_INC = [
     'STOP'
 ]
 
+ADD_BY_INC_SKETCH = [
+    'JMP0_A', 6,
+    'HOLE',#'INC_B',
+    'HOLE',#'DEC_A',
+    'JMP', 0,
+    'STOP'
+]
+
 class InstructionSet:
     def __init__(self, n, l, s):
         self.n = n
@@ -118,6 +126,28 @@ class InstructionSet:
 
     def sm(self, x):
         return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+
+    def empty_sketch(self):
+        return ['HOLE' for i in range(self.l)]
+
+    def fill_program(self, sketch, holes):
+        hole_index = 0
+        word_index = 0
+        n_lines = len(sketch)
+        n_holes = len(holes)
+        program = []
+        while word_index<n_lines:
+            word = sketch[word_index]
+            if word == 'HOLE':
+                hole_item = to_discrete_item(holes[hole_index])
+                hole_word = self.instruction_names[hole_item]
+                program.append(hole_word)
+                hole_index += 1
+            else:
+                program.append(word)
+            word_index += 1
+        assert hole_index == n_holes
+        return program
 
     def program_to_one_hot(self, program):
         np = len(program)
@@ -203,6 +233,7 @@ class MachineState:
 class Machine(hk.RNNCore):
     def __init__(
             self,
+            hard_sketch,
             name: Optional[str] = None
     ):
         super().__init__(name=name)
@@ -211,16 +242,12 @@ class Machine(hk.RNNCore):
         self.s = MachineState(self.n, self.l)
         self.i = InstructionSet(self.n, self.l, self.s)
         self.ni = self.i.ni
-        self.hard_sketch = ['HOLE' for i in range(self.l)]
+        self.hard_sketch = hard_sketch
         self.init_hard_sketch()
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
         return new_state, new_state
-
-    def set_hard_sketch(self, hard_sketch):
-        self.hard_sketch = hard_sketch
-        self.init_hard_sketch()
 
     def init_hard_sketch(self):
         self.sketch_program = [word if word != 'HOLE' else 'NOP' for word in self.hard_sketch]
@@ -246,7 +273,7 @@ class Machine(hk.RNNCore):
 
     def make_code_fun(self):
         # all holes are initialized to NOPs
-        code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.l)])
+        code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.n_holes)])
 
         def code_fun(shape, dtype):
             return code
@@ -256,8 +283,8 @@ class TrainingState(NamedTuple):
   params: hk.Params
   opt_state: optax.OptState
 
-def make_network() -> Machine:
-    model = Machine()
+def make_network(hard_sketch) -> Machine:
+    model = Machine(hard_sketch)
     return model
 
 def make_optimizer() -> optax.GradientTransformation:
@@ -265,7 +292,7 @@ def make_optimizer() -> optax.GradientTransformation:
   return optax.adam(LEARNING_RATE.value)
 
 def forward(input) -> jnp.ndarray:
-  core = make_network()
+  core = make_network(ADD_BY_INC_SKETCH)
   sequence_length = S.value
   initial_state = core.initial_state(input, batch_size=None)
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(sequence_length) for i in range(sequence_length)], initial_state)
@@ -367,9 +394,11 @@ def main(_):
         state = update(state, t)
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
+    holes = state.params['machine']['code']
+    learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
     def header():
         print('MACHINE CODE learnt')
-        print(iset.discrete_code(state.params['machine']['code']))
+        print(learnt_program)
 
     header()
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
