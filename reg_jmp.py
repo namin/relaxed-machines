@@ -75,8 +75,8 @@ class InstructionSet:
         self.instruction_map = INSTRUCTION_MAP
         self.ani = len(self.instruction_names)
         self.ni = self.ani
-        assert self.ni <= self.l, f"number of instructions ({self.ni}) should be <= number of lines of code ({self.l})"
-        self.ni = self.l # pad to be able to address each of the l lines of code
+        if self.ni <= self.l:
+            self.ni = self.l # pad to be able to address each of the l lines of code
         self.index_NOP = self.instruction_map['NOP']
         self.index_STOP = self.instruction_map['STOP']
         assert self.is_instr('STOP', self.index_STOP)
@@ -110,12 +110,14 @@ class InstructionSet:
         elif instr == 'DEC_B':
             reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
         elif instr == 'JMP':
-            next_pc = jnp.matmul(next_pc, code)
+            next_pc = jnp.matmul(next_pc, code)[0:self.l]
         elif instr.startswith('JMP0_'):
             assert instr == 'JMP0_A' or instr == 'JMP0_B'
             reg = reg_a if instr[-1] == 'A' else reg_b
             p = jnp.dot(reg, jax.nn.one_hot(0, self.n))
-            next_pc = (1-p)*jnp.matmul(next_pc, self.inc_matrix(self.l)) + p*jnp.matmul(next_pc, code)
+            non_zero_next = jnp.matmul(next_pc, self.inc_matrix(self.l))
+            zero_jmp = jnp.matmul(next_pc, code)[0:self.l]
+            next_pc = (1-p)*non_zero_next + p*zero_jmp
         else:
             assert instr == 'NOP', f"Unhandled instruction {instr}"
         return (reg_a, reg_b, next_pc)
@@ -177,7 +179,7 @@ class InstructionSet:
         p = [self.instruction_map.get(word, word) for word in program]
         for i in range(np, self.l):
             p.append(self.index_STOP)
-        r = jax.nn.one_hot(p, self.l)
+        r = jax.nn.one_hot(p, self.ni)
         return r
 
     def discrete_code(self, code):
