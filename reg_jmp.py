@@ -419,8 +419,10 @@ def main(_):
 
     rng = hk.PRNGSequence(SEED.value)
 
+    print('generating training data...')
     train_data = train_data_add_by_inc()
     n_train_data = len(train_data)
+    print('...done!')
 
     train_data = itertools.cycle(train_data)
     # I tried shuffling the order but it made learning worse.
