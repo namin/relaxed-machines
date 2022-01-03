@@ -47,8 +47,8 @@ Next steps (TODOs)
 
 - [x] Wrote assertions to stand for tests.
 
-- [ ] Define sketches.
-  - [ ] Could implement a "soft" sketch as initialization.
+- [x] Define sketches.
+  - [x] Could implement a "soft" sketch as initialization.
   - [x] Could implement a "hard" sketch by restricting code parameters to holes.
         
     - [x] By itself, a hard sketch does not seem to help reduce training steps.
