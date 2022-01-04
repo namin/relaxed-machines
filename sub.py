@@ -577,5 +577,28 @@ def main(_):
 
     header()
 
+def debug(_):
+    n = N.value
+    l = L.value
+    a = 1
+    b = 2
+    # this is actually true!
+    program = ['JMP0_A', 5, 'INC_B', 'DEC_A', 'RET', 'PUSH_A', 'STOP', 'CALL', 'INC_B']
+    i = DiscreteInstructionSet(n, l, MachineState(n, l))
+    code = i.program_to_one_hot(program)
+    print('MACHINE CODE')
+    print(i.discrete_code(code))
+    reg_a = jax.nn.one_hot(a, n)
+    reg_b = jax.nn.one_hot(b, n)
+    state = i.s.initial(reg_a, reg_b)
+    i.s.print(state)
+    halted = False
+    while not halted:
+        state = i.step(code, state)
+        i.s.print(state)
+        (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = i.s.unpack(state)
+        d_halted = to_discrete_item(res_halted)
+        halted = d_halted==0
+
 if __name__ == '__main__':
     app.run(main)
