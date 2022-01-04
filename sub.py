@@ -18,6 +18,10 @@ import optax
 
 import itertools
 
+import notify
+
+NOTIFY = flags.DEFINE_boolean('notify', False, 'notify when training is complete (Mac OS X)')
+
 N = flags.DEFINE_integer('n', 4, 'number of integers')
 L = flags.DEFINE_integer('l', 10, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
@@ -600,6 +604,9 @@ def main(_):
     for step in range(TRAINING_STEPS.value + 1):
         t = some_train_data(next(rng))
         state = update(state, t)
+
+    if NOTIFY.value:
+        notify.done()
 
     iset = InstructionSet(N.value, L.value, MachineState(N.value, L.value))
     holes = state.params['machine']['code']
