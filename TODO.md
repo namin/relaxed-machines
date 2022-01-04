@@ -1,7 +1,7 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Flesh out a machine with subroutines.
+- [ ] Learn whether pytrees can improve the code (less repetition).
 - [ ] Implement sketches like ∂4.
 - [ ] Add batching.
 - [ ] Debug order of training samples.
@@ -9,6 +9,8 @@ Next steps (TODOs)
 ## Log
 
 ### [`inc_stop`](inc_stop.py)
+
+- [x] Flesh a baby machine, which can add by a constant using repeated `INC`.
 
 - [x] Exploited a `halted` state to avoid running after stopping.
 
@@ -21,6 +23,8 @@ Next steps (TODOs)
 - [ ] Consider refactoring the logic outside the network module as for `dup_add` to continue using this file as a starting point.
 
 ### [`dup_add`](dup_add.py)
+
+- [x] Flesh a machine that uses a stack.
 
 - [x] Refactored most of the instruction and state logic to be outside the network module, to good effect.
 
@@ -62,3 +66,9 @@ Next steps (TODOs)
       Weirdly, this happens when using a full mask vs the state, which shouldn't make a difference.
 
 - [ ] Unroll the number of steps according to the computation.
+
+## [`sub`](sub.py)
+
+- [x] Flesh out a machine with subroutines.
+
+- [ ] Learns garbage. Debug instructions.
