@@ -39,7 +39,8 @@ MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
-INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+#INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -96,10 +97,10 @@ class InstructionSet:
     def is_instr(self, name, index):
         return self.get_instruction_name(index) == name
 
-    def execute_instr(self, code, i, reg_a, reg_b, pc):
+    def execute_instr(self, code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret):
         instr = self.get_instruction_name(i)
         if instr == 'STOP':
-            return (reg_a, reg_b, pc)
+            return (reg_a, reg_b, pc, data_p, data, ret_p, ret)
         next_pc = jnp.matmul(pc, self.inc_matrix(self.l))
         if instr == 'INC_A':
             reg_a = jnp.matmul(reg_a, self.inc_matrix(self.n))
@@ -120,9 +121,10 @@ class InstructionSet:
             next_pc = (1-p)*non_zero_next + p*zero_jmp
         else:
             assert instr == 'NOP', f"Unhandled instruction {instr}"
-        return (reg_a, reg_b, next_pc)
+        return (reg_a, reg_b, next_pc, data_p, data, ret_p, ret)
 
     def step(self, code, state):
+        # TODO: unwieldly...
         (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.s.unpack(state, self.sm)
         sel = jnp.zeros(self.ni)
         for i in range(self.l):
@@ -130,18 +132,30 @@ class InstructionSet:
         new_reg_a = jnp.zeros(self.n)
         new_reg_b = jnp.zeros(self.n)
         new_pc = jnp.zeros(self.l)
+        new_data_p = jnp.zeros(self.n)
+        new_data = jnp.zeros([self.n, self.n])
+        new_ret_p = jnp.zeros(self.n)
+        new_ret = jnp.zeros([self.n, self.n])
         for i in range(self.ni):
-            (delta_reg_a, delta_reg_b, delta_pc) = self.execute_instr(code, i, reg_a, reg_b, pc)
+            (delta_reg_a, delta_reg_b, delta_pc, delta_data_p, delta_data, delta_ret_p, delta_ret) = self.execute_instr(code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret)
             new_reg_a += sel[i] * delta_reg_a
             new_reg_b += sel[i] * delta_reg_b
             new_pc += sel[i] * delta_pc
+            new_data_p += sel[i] * delta_data_p
+            new_data += sel[i] * delta_data
+            new_ret_p += sel[i] * delta_ret_p
+            new_ret += sel[i] * delta_ret
         next_reg_a = halted[0] * reg_a + halted[1] * new_reg_a
         next_reg_b = halted[0] * reg_b + halted[1] * new_reg_b
         next_pc = halted[0] * pc + halted[1] * new_pc
+        next_data_p = halted[0] * data_p + halted[1] * new_data_p
+        next_data = halted[0] * data + halted[1] * new_data
+        next_ret_p = halted[0] * ret_p + halted[1] * new_ret_p
+        next_ret = halted[0] * ret + halted[1] * new_ret
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        next_state = self.s.pack(next_reg_a, next_reg_b, next_pc, next_halted)
+        next_state = self.s.pack(next_reg_a, next_reg_b, next_pc, next_halted, next_data_p, next_data, next_ret_p, next_ret)
         return next_state
 
     def sm(self, x):
@@ -215,13 +229,10 @@ class MachineState:
     def write_value(self, p, buffer, value):
         old = jnp.outer(p, jnp.ones(self.n)) * buffer
         new = jnp.outer(p, value)
-        return data - old + new
+        return buffer - old + new
 
     def over_buffer(self, buffer, fn):
-        # TODO: can we use a tree_map?
-        for i in range(self.n):
-            buffer = buffer.at[i].set(fn(buffer[i]))
-        return buffer
+        return jnp.array([fn(x) for x in buffer])
 
     def to_buffer(self, line):
         return jnp.reshape(line, [self.n, self.n])
@@ -420,7 +431,7 @@ def check_add_by_inc(i, inp, fin):
     state = fin
     a = to_discrete_item(reg_a)
     b = to_discrete_item(reg_b)
-    (res_a, res_b, res_pc, res_halted) = i.s.unpack(state)
+    (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = i.s.unpack(state)
     d_a = to_discrete_item(res_a)
     d_b = to_discrete_item(res_b)
     d_halted = to_discrete_item(res_halted)
