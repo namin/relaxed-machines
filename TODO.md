@@ -1,6 +1,8 @@
 Next steps (TODOs)
 ----------
 
+- [ ] Try incorporating temperature (inverse sharpness of softmax).
+- [ ] Try using Gumbel-softmax instead of softmax.
 - [ ] Learn whether pytrees can improve the code (less repetition).
 - [ ] Implement sketches like ∂4.
 - [ ] Add batching.
