@@ -39,8 +39,8 @@ MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
-#INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
-INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+#INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -97,12 +97,45 @@ class InstructionSet:
     def is_instr(self, name, index):
         return self.get_instruction_name(index) == name
 
+    def push(self, buffer_p, buffer, buffer_value):
+        next_buffer_p = jnp.matmul(buffer_p, self.inc_matrix(self.n))
+        next_buffer = self.s.write_value(next_buffer_p, buffer, buffer_value)
+        return (next_buffer_p, next_buffer)
+
+    def pop(self, buffer_p, buffer):
+        buffer_value = self.s.read_value(buffer_p, buffer)
+        # Learning is easier when leaving the state dirty...
+        next_buffer = buffer
+        # next_buffer = self.s.write_value(buffer_p, buffer, self.clear_buffer_value)
+        next_buffer_p = jnp.matmul(buffer_p, self.dec_matrix(self.n))
+        return (next_buffer_p, next_buffer, buffer_value)
+
     def execute_instr(self, code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret):
         instr = self.get_instruction_name(i)
         if instr == 'STOP':
             return (reg_a, reg_b, pc, data_p, data, ret_p, ret)
         next_pc = jnp.matmul(pc, self.inc_matrix(self.l))
-        if instr == 'INC_A':
+        if instr.startswith('PUSH'):
+            assert instr == 'PUSH_A' or instr == 'PUSH_B'
+            reg = reg_a if instr[-1] == 'A' else reg_b
+            (data_p, data) = self.push(data_p, data, reg)
+        elif instr.startswith('POP'):
+            assert instr == 'POP_A' or instr == 'POP_B'
+            (data_p, data, data_value) = self.pop(data_p, data)
+            if instr[-1] == 'A':
+                reg_a = data_value
+            else:
+                reg_b = data_value
+        elif instr == 'INC' or instr == 'DEC':
+            (data_p, data, data_value) = self.pop(data_p, data)
+            if instr == 'INC':
+                m = self.inc_matrix(self.n)
+            else:
+                assert instr == 'DEC'
+                m = self.dec_matrix(self.n)
+            data_value = jnp.matmul(data_value, m)
+            (data_p, data) = self.push(data_p, data, data_value)
+        elif instr == 'INC_A':
             reg_a = jnp.matmul(reg_a, self.inc_matrix(self.n))
         elif instr == 'INC_B':
             reg_b = jnp.matmul(reg_b, self.inc_matrix(self.n))
@@ -112,9 +145,13 @@ class InstructionSet:
             reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
         elif instr == 'JMP':
             next_pc = jnp.matmul(next_pc, code)[0:self.l]
-        elif instr.startswith('JMP0_'):
-            assert instr == 'JMP0_A' or instr == 'JMP0_B'
-            reg = reg_a if instr[-1] == 'A' else reg_b
+        elif instr.startswith('JMP0'):
+            assert instr == 'JMP0' or instr == 'JMP0_A' or instr == 'JMP0_B'
+            if instr == 'JMP0':
+                (data_p, data, data_value) = self.pop(data_p, data)
+                reg = data_value
+            else:
+                reg = reg_a if instr[-1] == 'A' else reg_b
             p = jnp.dot(reg, jax.nn.one_hot(0, self.n))
             non_zero_next = jnp.matmul(next_pc, self.inc_matrix(self.l))
             zero_jmp = jnp.matmul(next_pc, code)[0:self.l]
