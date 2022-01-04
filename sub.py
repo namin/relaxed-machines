@@ -256,7 +256,7 @@ class InstructionSet:
             if word == 'HOLE':
                 hole_item = to_discrete_item(holes[hole_index])
                 if self.is_wide_word(prev_word):
-                    hole_word = hole_item
+                    hole_word = hole_item % self.l
                 else:
                     hole_word = self.instruction_names[hole_item]
                 word = hole_word
