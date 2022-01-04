@@ -178,7 +178,8 @@ class InstructionSet:
         elif instr == 'DEC_B':
             reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
         elif instr == 'CALL':
-            (ret_p, ret) = self.push(ret_p, ret, next_pc, self.l)
+            push_pc = jnp.matmul(next_pc, self.inc_matrix(self.l))
+            (ret_p, ret) = self.push(ret_p, ret, push_pc, self.l)
             next_pc = jnp.matmul(next_pc, code)[0:self.l]
         elif instr == 'RET':
             (ret_p, ret, ret_value) = self.pop(ret_p, ret, self.l)
@@ -477,7 +478,7 @@ class Machine(hk.RNNCore):
                 code = self.i.sketch_to_one_hot(ADD_BY_INC_SUB_SKETCH)
             else:
                 # we initialize to the whole program... a bit silly, but to try out
-                code = self.i.sletch_to_one_hot(ADD_BY_INC)
+                code = self.i.sketch_to_one_hot(ADD_BY_INC)
         else:
             # all holes are initialized to NOPs
             code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.n_holes)])
