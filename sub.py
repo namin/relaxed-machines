@@ -31,6 +31,7 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 110000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
+TRAIN_DATA_WITH_SUB = flags.DEFINE_boolean('train_data_with_sub', True, 'train the data with the _SUB program as opposed to the vanilla one')
 HARD_SKETCH = flags.DEFINE_boolean('hard', False, 'whether to use a hard sketch: only parameters for holes')
 SOFT_SKETCH = flags.DEFINE_boolean('soft', False, 'whether to use a soft sketch: initial state, full parameters')
 SKETCH = flags.DEFINE_boolean('sketch', False, 'whether to sketch')
@@ -101,6 +102,15 @@ ADD_BY_INC_SKETCH_NO_JMP = [
     'HOLE', 'HOLE',#'JMP', 0,
     'STOP'
 ]
+
+def pick_ADD_BY_INC():
+    return ADD_BY_INC_SUB if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC
+
+def pick_ADD_BY_INC_SKETCH():
+    return ADD_BY_INC_SUB_SKETCH if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC_SKETCH
+
+def pick_ADD_BY_INC_SKETCH_NO_JMP():
+    return ADD_BY_INC_SUB_SKETCH_NO_JMP if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC_SKETCH_NO_JMP
 
 class InstructionSet:
     def __init__(self, n, l, s):
@@ -440,9 +450,9 @@ class Machine(hk.RNNCore):
         self.ni = self.i.ni
         if HARD_SKETCH.value:
             if SKETCH_NO_JMP.value:
-                self.hard_sketch = ADD_BY_INC_SUB_SKETCH_NO_JMP
+                self.hard_sketch = pick_ADD_BY_INC_SKETCH_NO_JMP()
             else:
-                self.hard_sketch = ADD_BY_INC_SUB_SKETCH
+                self.hard_sketch = pick_ADD_BY_INC_SKETCH()
         else:
             self.hard_sketch = self.i.empty_sketch()
         self.init_hard_sketch()
@@ -476,12 +486,12 @@ class Machine(hk.RNNCore):
         if SOFT_SKETCH.value:
             assert not HARD_SKETCH.value, "not yet supported"
             if SKETCH_NO_JMP.value:
-                code = self.i.sketch_to_one_hot(ADD_BY_INC_SUB_SKETCH_NO_JMP)
+                code = self.i.sketch_to_one_hot(pick_ADD_BY_INC_SKETCH_NO_JMP())
             elif SKETCH.value:
-                code = self.i.sketch_to_one_hot(ADD_BY_INC_SUB_SKETCH)
+                code = self.i.sketch_to_one_hot(pick_ADD_BY_INC_SKETCH())
             else:
                 # we initialize to the whole program... a bit silly, but to try out
-                code = self.i.sketch_to_one_hot(ADD_BY_INC)
+                code = self.i.sketch_to_one_hot(pick_ADD_BY_INC())
         else:
             # all holes are initialized to NOPs
             code = jnp.array([[1.0 if i==self.i.index_NOP else 0.0 for i in range(self.ni)] for l in range(self.n_holes)])
@@ -550,7 +560,7 @@ def check_add_by_inc(i, inp, fin):
 def train_data_add_by_inc():
     n = N.value
     l = L.value
-    program = ADD_BY_INC_SUB
+    program = pick_ADD_BY_INC()
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE for training')
@@ -616,9 +626,9 @@ def main(_):
     holes = state.params['machine']['code']
     if HARD_SKETCH.value:
         if SKETCH_NO_JMP.value:
-            learnt_program = iset.fill_program(ADD_BY_INC_SUB_SKETCH_NO_JMP, holes)
+            learnt_program = iset.fill_program(pick_ADD_BY_INC_SKETCH_NO_JMP(), holes)
         elif SKETCH.value:
-            learnt_program = iset.fill_program(ADD_BY_INC_SUB_SKETCH, holes)
+            learnt_program = iset.fill_program(pick_ADD_BY_INC_SKETCH(), holes)
         else:
             learnt_program = iset.discrete_code(holes)
     else:
