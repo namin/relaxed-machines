@@ -75,4 +75,4 @@ Next steps (TODOs)
 
 - [x] Learns garbage. Debug instructions. The machine is just clever, exploiting using the return stack out of bound.
 
-- [ ] Penalize unsafe code (with out-of-bound errors).
+- [ ] Penalize unsafe code (with out-of-bound errors including dual-purposing labels as instructions).
