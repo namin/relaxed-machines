@@ -242,7 +242,7 @@ class InstructionSet:
             program.append(word)
             index += 1
             if word.startswith('JMP') and index < self.l:
-                w = to_discrete_item(code[index])
+                w = to_discrete_item(code[index]) % self.l
                 program.append(w)
                 index += 1
         return program
