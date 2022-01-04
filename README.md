@@ -7,6 +7,7 @@ Baby steps (see the [log](TODO.md#log)):
 1. [`inc_stop`](inc_stop.py)
 2. [`dup_add`](dup_add.py)
 3. [`reg_jmp`](reg_jmp.py)
+4. [`sub`](sub.py)
 
 ## Libraries
 - [JAX](https://github.com/google/jax)

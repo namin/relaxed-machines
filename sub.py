@@ -1,8 +1,6 @@
-"""A differentiable machine with two registers and conditional and unconditional jumping.
+"""A differentiable machine with two registers, a data stack, a return stack, conditional and unconditional jumping, and subroutine calling and returning.
 
 The parameters of the machine are the lines of code.
-
-The learning task is to learn addition by repeated incrementation.
 """
 
 from typing import Any, NamedTuple, Optional
