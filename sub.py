@@ -297,6 +297,9 @@ class InstructionSet:
                 index += 1
         return program
 
+    def enjolivate(self, program):
+        return [str(i)+':'+('('+self.instruction_names[line]+'):'+str(line) if isinstance(line, int) else line) for i, line in enumerate(program)]
+
 class DiscreteInstructionSet(InstructionSet):
     def __init__(self, n, l, s):
         super().__init__(n, l, s)
@@ -623,7 +626,7 @@ def main(_):
 
     def header():
         print('MACHINE CODE learnt')
-        print(learnt_program)
+        print(iset.enjolivate(learnt_program))
 
     header()
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
@@ -631,8 +634,8 @@ def main(_):
         t = some_train_data(next(rng))
         inp = t['input']
         states = forward_fn(state.params, inp)
-        check_add_by_inc(iset, inp, states[-1])
         print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
+        check_add_by_inc(iset, inp, states[-1])
         halted = False
         for j, st in enumerate(states):
             new_halted  = to_discrete_item(iset.s.halted(st)) == 0
@@ -656,7 +659,7 @@ def debug(_):
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE')
-    print(i.discrete_code(code))
+    print(i.enjolivate(i.discrete_code(code)))
     reg_a = jax.nn.one_hot(a, n)
     reg_b = jax.nn.one_hot(b, n)
     state = i.s.initial(reg_a, reg_b)
