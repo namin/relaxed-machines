@@ -43,7 +43,7 @@ MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted
 MASK_DATA_P = flags.DEFINE_boolean('mask_data_p', False, 'whether to mask the data stack pointer')
 MASK_DATA = flags.DEFINE_boolean('mask_data', False, 'whether to mask the data stack buffer')
 MASK_RET_P = flags.DEFINE_boolean('mask_ret_p', False, 'whether to mask the return stack pointer')
-MASK_RET = flags.DEFINE_boolean('mask_dret', False, 'whether to mask the return stack buffer')
+MASK_RET = flags.DEFINE_boolean('mask_ret', False, 'whether to mask the return stack buffer')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
 INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
