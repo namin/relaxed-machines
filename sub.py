@@ -39,8 +39,7 @@ MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
-INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
-#INSTRUCTION_NAMES = ['INC_A', 'INC_B', 'DEC_A', 'DEC_B', 'JMP0_A', 'JMP0_B', 'JMP', 'NOP', 'STOP']
+INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
 ADD_BY_INC = [
@@ -97,17 +96,16 @@ class InstructionSet:
     def is_instr(self, name, index):
         return self.get_instruction_name(index) == name
 
-    def push(self, buffer_p, buffer, buffer_value):
-        next_buffer_p = jnp.matmul(buffer_p, self.inc_matrix(self.n))
-        next_buffer = self.s.write_value(next_buffer_p, buffer, buffer_value)
+    def push(self, buffer_p, buffer, buffer_value, buffer_size):
+        next_buffer_p = jnp.matmul(buffer_p, self.inc_matrix(buffer_size))
+        next_buffer = self.s.write_value(next_buffer_p, buffer, buffer_value, buffer_size)
         return (next_buffer_p, next_buffer)
 
-    def pop(self, buffer_p, buffer):
+    def pop(self, buffer_p, buffer, buffer_size):
         buffer_value = self.s.read_value(buffer_p, buffer)
         # Learning is easier when leaving the state dirty...
         next_buffer = buffer
-        # next_buffer = self.s.write_value(buffer_p, buffer, self.clear_buffer_value)
-        next_buffer_p = jnp.matmul(buffer_p, self.dec_matrix(self.n))
+        next_buffer_p = jnp.matmul(buffer_p, self.dec_matrix(buffer_size))
         return (next_buffer_p, next_buffer, buffer_value)
 
     def execute_instr(self, code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret):
@@ -118,23 +116,23 @@ class InstructionSet:
         if instr.startswith('PUSH'):
             assert instr == 'PUSH_A' or instr == 'PUSH_B'
             reg = reg_a if instr[-1] == 'A' else reg_b
-            (data_p, data) = self.push(data_p, data, reg)
+            (data_p, data) = self.push(data_p, data, reg, self.n)
         elif instr.startswith('POP'):
             assert instr == 'POP_A' or instr == 'POP_B'
-            (data_p, data, data_value) = self.pop(data_p, data)
+            (data_p, data, data_value) = self.pop(data_p, data, self.n)
             if instr[-1] == 'A':
                 reg_a = data_value
             else:
                 reg_b = data_value
         elif instr == 'INC' or instr == 'DEC':
-            (data_p, data, data_value) = self.pop(data_p, data)
+            (data_p, data, data_value) = self.pop(data_p, data, self.n)
             if instr == 'INC':
                 m = self.inc_matrix(self.n)
             else:
                 assert instr == 'DEC'
                 m = self.dec_matrix(self.n)
             data_value = jnp.matmul(data_value, m)
-            (data_p, data) = self.push(data_p, data, data_value)
+            (data_p, data) = self.push(data_p, data, data_value, self.n)
         elif instr == 'INC_A':
             reg_a = jnp.matmul(reg_a, self.inc_matrix(self.n))
         elif instr == 'INC_B':
@@ -143,12 +141,18 @@ class InstructionSet:
             reg_a = jnp.matmul(reg_a, self.dec_matrix(self.n))
         elif instr == 'DEC_B':
             reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
+        elif instr == 'CALL':
+            (ret_p, ret) = self.push(ret_p, ret, pc, self.l)
+            next_pc = jnp.matmul(next_pc, code)[0:self.l]
+        elif instr == 'RET':
+            (ret_p, ret, ret_value) = self.pop(ret_p, ret, self.l)
+            next_pc = ret_value
         elif instr == 'JMP':
             next_pc = jnp.matmul(next_pc, code)[0:self.l]
         elif instr.startswith('JMP0'):
             assert instr == 'JMP0' or instr == 'JMP0_A' or instr == 'JMP0_B'
             if instr == 'JMP0':
-                (data_p, data, data_value) = self.pop(data_p, data)
+                (data_p, data, data_value) = self.pop(data_p, data, self.n)
                 reg = data_value
             else:
                 reg = reg_a if instr[-1] == 'A' else reg_b
@@ -171,8 +175,8 @@ class InstructionSet:
         new_pc = jnp.zeros(self.l)
         new_data_p = jnp.zeros(self.n)
         new_data = jnp.zeros([self.n, self.n])
-        new_ret_p = jnp.zeros(self.n)
-        new_ret = jnp.zeros([self.n, self.n])
+        new_ret_p = jnp.zeros(self.l)
+        new_ret = jnp.zeros([self.l, self.l])
         for i in range(self.ni):
             (delta_reg_a, delta_reg_b, delta_pc, delta_data_p, delta_data, delta_ret_p, delta_ret) = self.execute_instr(code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret)
             new_reg_a += sel[i] * delta_reg_a
@@ -263,32 +267,32 @@ class MachineState:
     def read_value(self, p, buffer):
         return jnp.matmul(p.T, buffer).T
 
-    def write_value(self, p, buffer, value):
-        old = jnp.outer(p, jnp.ones(self.n)) * buffer
+    def write_value(self, p, buffer, value, buffer_size):
+        old = jnp.outer(p, jnp.ones(buffer_size)) * buffer
         new = jnp.outer(p, value)
         return buffer - old + new
 
     def over_buffer(self, buffer, fn):
         return jnp.array([fn(x) for x in buffer])
 
-    def to_buffer(self, line):
-        return jnp.reshape(line, [self.n, self.n])
+    def to_buffer(self, line, buffer_size):
+        return jnp.reshape(line, [buffer_size, buffer_size])
 
-    def pack_buffer(self, buffer):
-        return jnp.reshape(buffer, self.n*self.n)
+    def pack_buffer(self, buffer, buffer_size):
+        return jnp.reshape(buffer, buffer_size*buffer_size)
 
-    def new_stack(self):
-        p = jnp.zeros(self.n).at[0].set(1)
-        buffer = jnp.zeros([self.n, self.n])
-        for i in range(self.n):
+    def new_stack(self, buffer_size):
+        p = jnp.zeros(buffer_size).at[0].set(1)
+        buffer = jnp.zeros([buffer_size, buffer_size])
+        for i in range(buffer_size):
             buffer = buffer.at[(i,0)].set(1)
         return (p, buffer)
 
     def initial(self, reg_a, reg_b):
         pc = jnp.zeros([self.l]).at[0].set(1)
         halted = jnp.array([0, 1])
-        (data_p, data) = self.new_stack()
-        (ret_p, ret) = self.new_stack()
+        (data_p, data) = self.new_stack(self.n)
+        (ret_p, ret) = self.new_stack(self.l)
         state = self.pack(reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
         return state
 
@@ -304,7 +308,7 @@ class MachineState:
         return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def pack(self, reg_a, reg_b, pc, halted, data_p, data, ret_p, ret):
-        return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data), ret_p, self.pack_buffer(ret)))
+        return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data, self.n), ret_p, self.pack_buffer(ret, self.l)))
 
     def reg_a(self, state):
         return state[0:self.n]
@@ -322,13 +326,13 @@ class MachineState:
         return state[2*self.n+self.l+2:3*self.n+self.l+2]
 
     def data(self, state):
-        return self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n])
+        return self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n], self.n)
 
     def ret_p(self, state):
-        return state[3*self.n+self.l+2+self.n*self.n:4*self.n+self.l+2+self.n*self.n]
+        return state[3*self.n+self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n]
 
     def ret(self, state):
-        return self.to_buffer(state[4*self.n+self.l+2+self.n*self.n:4*self.n+self.l+2+2*self.n*self.n])
+        return self.to_buffer(state[3*self.n+2*self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n+self.l*self.l], self.l)
 
     def mask(self, state):
         (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.unpack(state)
