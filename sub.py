@@ -54,6 +54,26 @@ ADD_BY_INC_SUB = [
     'RET'       # 9
 ]
 
+ADD_BY_INC_SUB_SKETCH = [
+    'JMP0_A', 6, # 0
+    'CALL', 7,  # 2
+    'JMP', 0,   # 4
+    'STOP',     # 6
+    'HOLE',#'INC_B',    # 7: SUB
+    'HOLE',#'DEC_A',    # 8
+    'RET'       # 9
+]
+
+ADD_BY_INC_SUB_SKETCH_NO_JMP = [
+    'HOLE', 'HOLE',#'JMP0_A', 6, # 0
+    'CALL', 7,  # 2
+    'HOLE', 'HOLE',#'JMP', 0,   # 4
+    'STOP',     # 6
+    'INC_B',    # 7: SUB
+    'DEC_A',    # 8
+    'RET'       # 9
+]
+
 ADD_BY_INC = [
     'JMP0_A', 6,
     'INC_B',
@@ -403,9 +423,9 @@ class Machine(hk.RNNCore):
         self.ni = self.i.ni
         if HARD_SKETCH.value:
             if SKETCH_NO_JMP.value:
-                self.hard_sketch = ADD_BY_INC_SKETCH_NO_JMP
+                self.hard_sketch = ADD_BY_INC_SUB_SKETCH_NO_JMP
             else:
-                self.hard_sketch = ADD_BY_INC_SKETCH
+                self.hard_sketch = ADD_BY_INC_SUB_SKETCH
         else:
             self.hard_sketch = self.i.empty_sketch()
         self.init_hard_sketch()
@@ -439,9 +459,9 @@ class Machine(hk.RNNCore):
         if SOFT_SKETCH.value:
             assert not HARD_SKETCH.value, "not yet supported"
             if SKETCH_NO_JMP.value:
-                code = self.i.sketch_to_one_hot(ADD_BY_INC_SKETCH_NO_JMP)
+                code = self.i.sketch_to_one_hot(ADD_BY_INC_SUB_SKETCH_NO_JMP)
             elif SKETCH.value:
-                code = self.i.sketch_to_one_hot(ADD_BY_INC_SKETCH)
+                code = self.i.sketch_to_one_hot(ADD_BY_INC_SUB_SKETCH)
             else:
                 # we initialize to the whole program... a bit silly, but to try out
                 code = self.i.sletch_to_one_hot(ADD_BY_INC)
@@ -576,9 +596,9 @@ def main(_):
     holes = state.params['machine']['code']
     if HARD_SKETCH.value:
         if SKETCH_NO_JMP.value:
-            learnt_program = iset.fill_program(ADD_BY_INC_SKETCH_NO_JMP, holes)
+            learnt_program = iset.fill_program(ADD_BY_INC_SUB_SKETCH_NO_JMP, holes)
         elif SKETCH.value:
-            learnt_program = iset.fill_program(ADD_BY_INC_SKETCH, holes)
+            learnt_program = iset.fill_program(ADD_BY_INC_SUB_SKETCH, holes)
         else:
             learnt_program = iset.discrete_code(holes)
     else:
