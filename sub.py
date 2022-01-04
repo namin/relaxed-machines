@@ -19,9 +19,9 @@ import optax
 import itertools
 
 N = flags.DEFINE_integer('n', 3, 'number of integers')
-L = flags.DEFINE_integer('l', 9, 'number of lines of code')
+L = flags.DEFINE_integer('l', 10, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
-S = flags.DEFINE_integer('s', 22, 'number of steps when running the machine')
+S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 110000, '')
@@ -39,6 +39,16 @@ FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (po
 
 INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
+
+ADD_BY_INC_SUB = [
+    'JMP0_A', 6, # 0
+    'CALL', 7,  # 2
+    'JMP', 0,   # 4
+    'STOP',     # 6
+    'INC_B',    # 7: SUB
+    'DEC_A',    # 8
+    'RET'       # 9
+]
 
 ADD_BY_INC = [
     'JMP0_A', 6,
@@ -140,7 +150,7 @@ class InstructionSet:
         elif instr == 'DEC_B':
             reg_b = jnp.matmul(reg_b, self.dec_matrix(self.n))
         elif instr == 'CALL':
-            (ret_p, ret) = self.push(ret_p, ret, pc, self.l)
+            (ret_p, ret) = self.push(ret_p, ret, next_pc, self.l)
             next_pc = jnp.matmul(next_pc, code)[0:self.l]
         elif instr == 'RET':
             (ret_p, ret, ret_value) = self.pop(ret_p, ret, self.l)
@@ -350,13 +360,23 @@ class MachineState:
         reg_b = self.reg_b(state)
         pc = self.pc(state)
         halted = self.halted(state)
+        data_p = self.data_p(state)
+        data = self.data(state)
+        ret_p = self.ret_p(state)
+        ret = self.ret(state)
 
         reg_a = to_discrete_item(reg_a)
         reg_b = to_discrete_item(reg_b)
         pc = to_discrete_item(pc)
         halted = 'True ' if to_discrete_item(halted)==0 else 'False'
+        data_p = to_discrete_item(data_p)
+        data = to_discrete(data)
+        ret_p = to_discrete_item(ret_p)
+        ret = to_discrete(ret)
 
         print(f"""A: {reg_a}, B: {reg_b}, PC: {pc}, halted: {halted}""")
+        print(f"""data: ({data_p}) {data}""")
+        print(f"""ret: ({ret_p}) {ret}""")
 
 class Machine(hk.RNNCore):
     def __init__(
@@ -481,7 +501,7 @@ def check_add_by_inc(i, inp, fin):
 def train_data_add_by_inc():
     n = N.value
     l = L.value
-    program = ADD_BY_INC
+    program = ADD_BY_INC_SUB
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE for training')
@@ -489,15 +509,15 @@ def train_data_add_by_inc():
     r = []
     for a in range(n):
         for b in range(n):
-            #print(f"A = {a}, B = {b}")
+            print(f"A = {a}, B = {b}")
             reg_a = jax.nn.one_hot(a, n)
             reg_b = jax.nn.one_hot(b, n)
             state = i.s.initial(reg_a, reg_b)
-            #i.s.print(state)
+            i.s.print(state)
             target = []
             for k in range(S.value):
                 state = i.step(code, state)
-                #i.s.print(state)
+                i.s.print(state)
                 target.append(state)
             t = {'input':(reg_a, reg_b), 'target': jnp.array(target)}
             check_add_by_inc(i, t['input'], t['target'][-1])
