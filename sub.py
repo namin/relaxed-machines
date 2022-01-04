@@ -626,6 +626,7 @@ def main(_):
 
     def header():
         print('MACHINE CODE learnt')
+        print(learnt_program)
         print(iset.enjolivate(learnt_program))
 
     header()
@@ -659,7 +660,9 @@ def debug(_):
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE')
-    print(i.enjolivate(i.discrete_code(code)))
+    dcode = i.discrete_code(code)
+    print(dcode)
+    print(i.enjolivate(dcode))
     reg_a = jax.nn.one_hot(a, n)
     reg_b = jax.nn.one_hot(b, n)
     state = i.s.initial(reg_a, reg_b)
