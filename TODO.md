@@ -71,4 +71,6 @@ Next steps (TODOs)
 
 - [x] Flesh out a machine with subroutines.
 
-- [ ] Learns garbage. Debug instructions.
+- [x] Learns garbage. Debug instructions. The machine is just clever, exploiting using the return stack out of bound.
+
+- [ ] Penalize unsafe code (with out-of-bound errors).
