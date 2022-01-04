@@ -414,7 +414,7 @@ class MachineState:
             mask.append(self.pack_buffer(ret, self.l))
         return jnp.concatenate(mask)
 
-    def print(self, state):
+    def discrete(self, state):
         reg_a = self.reg_a(state)
         reg_b = self.reg_b(state)
         pc = self.pc(state)
@@ -427,11 +427,30 @@ class MachineState:
         reg_a = to_discrete_item(reg_a)
         reg_b = to_discrete_item(reg_b)
         pc = to_discrete_item(pc)
-        halted = 'True ' if to_discrete_item(halted)==0 else 'False'
+        halted = to_discrete_item(halted)
         data_p = to_discrete_item(data_p)
         data = to_discrete(data)
         ret_p = to_discrete_item(ret_p)
         ret = to_discrete(ret)
+
+        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
+
+    def check_similar_discrete(self, state1, state2):
+        (reg_a1, reg_b1, pc1, halted1, data_p1, data1, ret_p1, ret1) = self.discrete(state1)
+        (reg_a2, reg_b2, pc2, halted2, data_p2, data2, ret_p2, ret2) = self.discrete(state2)
+        assert reg_a1 == reg_a2
+        assert reg_b1 == reg_b2
+        assert pc1 == pc2
+        assert halted1 == halted2
+        assert data_p1 == data_p2
+        assert data1 == data2
+        assert ret_p1 == ret_p2
+        assert ret1 == ret2
+
+    def print(self, state):
+        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.discrete(state)
+
+        halted = 'True ' if halted==0 else 'False'
 
         print(f"""A: {reg_a}, B: {reg_b}, PC: {pc}, halted: {halted}""")
         print(f"""data: ({data_p}) {data}""")
@@ -640,14 +659,23 @@ def main(_):
         print(iset.enjolivate(learnt_program))
 
     header()
+    id = DiscreteInstructionSet(N.value, L.value, MachineState(N.value, L.value))
+    idcode = id.program_to_one_hot(learnt_program)
     _, forward_fn = hk.without_apply_rng(hk.transform(forward))
     for i in range(M.value):
         t = some_train_data(next(rng))
         inp = t['input']
+        reg_a = inp[0]
+        reg_b = inp[1]
+        a = to_discrete_item(reg_a)
+        b = to_discrete_item(reg_b)
+        print('A:', a, ', B:', b)
+        idstate = id.s.initial(reg_a, reg_b)
         states = forward_fn(state.params, inp)
-        print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
         halted = False
         for j, st in enumerate(states):
+            idstate = id.step(idcode, idstate)
+            iset.s.check_similar_discrete(idstate, st)
             new_halted  = to_discrete_item(iset.s.halted(st)) == 0
             if not halted:
                 iset.s.print(st)
