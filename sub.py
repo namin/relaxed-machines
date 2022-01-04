@@ -277,7 +277,7 @@ class InstructionSet:
             word = self.get_instruction_name(w)
             program.append(word)
             index += 1
-            if word.startswith('JMP') and index < self.l:
+            if (word.startswith('JMP') or word == 'CALL') and index < self.l:
                 w = to_discrete_item(code[index]) % self.l
                 program.append(w)
                 index += 1
