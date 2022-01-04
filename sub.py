@@ -237,21 +237,30 @@ class InstructionSet:
     def empty_sketch(self):
         return ['HOLE' for i in range(self.l)]
 
+    def is_wide_word(self, word):
+        return isinstance(word, str) and word.startswith('JMP') or word == 'CALL'
+
     def fill_program(self, sketch, holes):
         hole_index = 0
         word_index = 0
         n_lines = len(sketch)
         n_holes = len(holes)
         program = []
+        prev_word = None
         while word_index<n_lines:
             word = sketch[word_index]
             if word == 'HOLE':
                 hole_item = to_discrete_item(holes[hole_index])
-                hole_word = self.instruction_names[hole_item]
-                program.append(hole_word)
+                if self.is_wide_word(prev_word):
+                    hole_word = hole_item
+                else:
+                    hole_word = self.instruction_names[hole_item]
+                word = hole_word
+                program.append(word)
                 hole_index += 1
             else:
                 program.append(word)
+            prev_word = word
             word_index += 1
         assert hole_index == n_holes
         return program
@@ -277,7 +286,7 @@ class InstructionSet:
             word = self.get_instruction_name(w)
             program.append(word)
             index += 1
-            if (word.startswith('JMP') or word == 'CALL') and index < self.l:
+            if self.is_wide_word(word) and index < self.l:
                 w = to_discrete_item(code[index]) % self.l
                 program.append(w)
                 index += 1
