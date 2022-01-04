@@ -18,7 +18,7 @@ import optax
 
 import itertools
 
-N = flags.DEFINE_integer('n', 3, 'number of integers')
+N = flags.DEFINE_integer('n', 4, 'number of integers')
 L = flags.DEFINE_integer('l', 10, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
@@ -35,6 +35,10 @@ MASK_A = flags.DEFINE_boolean('mask_a', False, 'whether to mask A')
 MASK_B = flags.DEFINE_boolean('mask_b', False, 'whether to mask B')
 MASK_PC = flags.DEFINE_boolean('mask_pc', False, 'whether to mask PC')
 MASK_HALTED = flags.DEFINE_boolean('mask_halted', False, 'whether to mask halted status')
+MASK_DATA_P = flags.DEFINE_boolean('mask_data_p', False, 'whether to mask the data stack pointer')
+MASK_DATA = flags.DEFINE_boolean('mask_data', False, 'whether to mask the data stack buffer')
+MASK_RET_P = flags.DEFINE_boolean('mask_ret_p', False, 'whether to mask the return stack pointer')
+MASK_RET = flags.DEFINE_boolean('mask_dret', False, 'whether to mask the return stack buffer')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 
 INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
@@ -353,6 +357,14 @@ class MachineState:
             mask.append(pc)
         if not MASK_HALTED.value:
             mask.append(halted)
+        if not MASK_DATA_P.value:
+            mask.append(data_p)
+        if not MASK_DATA.value:
+            mask.append(self.pack_buffer(data, self.n))
+        if not MASK_RET_P.value:
+            mask.append(ret_p)
+        if not MASK_RET.value:
+            mask.append(self.pack_buffer(ret, self.l))
         return jnp.concatenate(mask)
 
     def print(self, state):
@@ -513,11 +525,11 @@ def train_data_add_by_inc():
             reg_a = jax.nn.one_hot(a, n)
             reg_b = jax.nn.one_hot(b, n)
             state = i.s.initial(reg_a, reg_b)
-            i.s.print(state)
+            #i.s.print(state)
             target = []
             for k in range(S.value):
                 state = i.step(code, state)
-                i.s.print(state)
+                #i.s.print(state)
                 target.append(state)
             t = {'input':(reg_a, reg_b), 'target': jnp.array(target)}
             check_add_by_inc(i, t['input'], t['target'][-1])
@@ -602,6 +614,8 @@ def debug(_):
     b = 2
     # this is actually true!
     program = ['JMP0_A', 5, 'INC_B', 'DEC_A', 'RET', 'PUSH_A', 'STOP', 'CALL', 'INC_B']
+    # this one is an infinite loop discreetely, but worked continuously
+    program = ['JMP0_A', 3, 'INC_B', 'DEC_A', 'JMP', 3, 'STOP', 'INC_B', 'INC', 'PUSH_A']
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
     print('MACHINE CODE')
@@ -619,4 +633,5 @@ def debug(_):
         halted = d_halted==0
 
 if __name__ == '__main__':
+    #app.run(debug)
     app.run(main)
