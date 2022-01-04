@@ -635,7 +635,6 @@ def main(_):
         inp = t['input']
         states = forward_fn(state.params, inp)
         print('A:', to_discrete_item(inp[0]), ', B:', to_discrete_item(inp[1]))
-        check_add_by_inc(iset, inp, states[-1])
         halted = False
         for j, st in enumerate(states):
             new_halted  = to_discrete_item(iset.s.halted(st)) == 0
@@ -644,6 +643,7 @@ def main(_):
             else:
                 assert halted == new_halted
             halted = new_halted
+        check_add_by_inc(iset, inp, states[-1])
 
     header()
 
