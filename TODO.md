@@ -10,7 +10,7 @@ Next steps (TODOs)
 
 ### [`inc_stop`](inc_stop.py)
 
-- [x] Flesh a baby machine, which can add by a constant using repeated `INC`.
+- [x] Flesh out a baby machine, which can add by a constant using repeated `INC`.
 
 - [x] Exploited a `halted` state to avoid running after stopping.
 
@@ -24,7 +24,7 @@ Next steps (TODOs)
 
 ### [`dup_add`](dup_add.py)
 
-- [x] Flesh a machine that uses a stack.
+- [x] Flesh out a machine that uses a stack.
 
 - [x] Refactored most of the instruction and state logic to be outside the network module, to good effect.
 
