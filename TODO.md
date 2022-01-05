@@ -73,6 +73,10 @@ Next steps (TODOs)
 
 - [x] Learns garbage. Debug instructions. The machine is just clever, exploiting using the return stack out of bound.
 
+- [ ] Investigate why learning improves when masks hide more.
+      For example, with `--hard --sketch --n 5`, the machine finds the correct program with `--mask_pc --mask_data_p --mask_data --mask_ret_p mask_ret`
+      but not when given the full state.
+
 - [ ] Penalize unsafe code (with out-of-bound errors including dual-purposing labels as instructions).
 
 ### [`sub_gumbel`](sub_gumbel.py)
