@@ -551,7 +551,10 @@ def mask_each(xs):
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = mask_each(forward(t['input']))
-  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
+  g = 0
+  if GUMBEL_SOFTMAX.value:
+      g = jax.random.gumbel(hk.next_rng_key(), states.shape)
+  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*(states+g))
   one_hot_labels = mask_each(t['target'])
   if FINAL.value:
       one_hot_labels = one_hot_labels[-1]
