@@ -250,9 +250,10 @@ class InstructionSet:
         return next_state
 
     def sm(self, x):
-        # TODO
-        jax.random.gumbel(hk.next_rng_key(), x.shape)
-        return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+        g = 0
+        if GUMBEL_SOFTMAX.value:
+            g = jax.random.gumbel(hk.next_rng_key(), x.shape)
+        return jax.nn.softmax(SOFTMAX_SHARP.value*(x+g))
 
     def empty_sketch(self):
         return ['HOLE' for i in range(self.l)]
