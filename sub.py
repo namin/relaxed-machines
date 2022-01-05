@@ -634,9 +634,13 @@ def main(_):
     initial_opt_state = opt_init(initial_params)
     state = TrainingState(params=initial_params, opt_state=initial_opt_state)
 
+    each_n = TRAINING_STEPS.value / 100
     for step in range(TRAINING_STEPS.value + 1):
         t = some_train_data(next(rng))
         state = update(state, t)
+        if step % each_n == 0:
+            print('.', end='', flush=True)
+    print()
 
     if NOTIFY.value:
         notify.done()
