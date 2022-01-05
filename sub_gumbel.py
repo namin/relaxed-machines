@@ -18,6 +18,8 @@ import optax
 
 import itertools
 
+from tqdm import tqdm
+
 import notify
 
 PRNGKey = jnp.ndarray
@@ -643,7 +645,7 @@ def main(_):
     initial_opt_state = opt_init(initial_params)
     state = TrainingState(params=initial_params, opt_state=initial_opt_state)
 
-    for step in range(TRAINING_STEPS.value + 1):
+    for step in tqdm(range(TRAINING_STEPS.value + 1)):
         t = some_train_data(next(rng))
         state = update(state, next(rng), t)
 

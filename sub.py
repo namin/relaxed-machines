@@ -18,9 +18,9 @@ import optax
 
 import itertools
 
-import notify
-
 from tqdm import tqdm
+
+import notify
 
 NOTIFY = flags.DEFINE_boolean('notify', False, 'notify when training is complete (Mac OS X)')
 
