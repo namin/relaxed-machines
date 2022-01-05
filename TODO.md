@@ -1,8 +1,6 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Try incorporating temperature (inverse sharpness of softmax).
-- [ ] Try using Gumbel-softmax instead of softmax.
 - [ ] Learn whether pytrees can improve the code (less repetition).
 - [ ] Implement sketches like ∂4.
 - [ ] Add batching.
@@ -76,3 +74,9 @@ Next steps (TODOs)
 - [x] Learns garbage. Debug instructions. The machine is just clever, exploiting using the return stack out of bound.
 
 - [ ] Penalize unsafe code (with out-of-bound errors including dual-purposing labels as instructions).
+
+### [`sub_gumbel`](sub_gumbel.py)
+
+- [x] Optionally use Gumbel-softmax instead of softmax. Required giving up on convenient `hk.without_apply_rng`.
+
+- [ ] Try incorporating temperature (inverse sharpness of softmax) decreasing during training.
