@@ -79,10 +79,8 @@ Next steps (TODOs)
 
 - [ ] Penalize unsafe code (with out-of-bound errors including dual-purposing labels as instructions).
 
-### [`sub_gumbel`](sub_gumbel.py)
-
 - [x] Optionally use Gumbel-softmax instead of softmax. Required giving up on convenient `hk.without_apply_rng`.
 
-- [ ] Try incorporating temperature (inverse sharpness of softmax) decreasing during training.
-
 - [x] Performance seems to be worse with the Gumbel-softmax option than without.
+
+- [ ] Try incorporating temperature (inverse sharpness of softmax) decreasing during training.

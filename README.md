@@ -8,7 +8,6 @@ Baby steps (see the [log](TODO.md#log)):
 2. [`dup_add`](dup_add.py)
 3. [`reg_jmp`](reg_jmp.py)
 4. [`sub`](sub.py)
-5. [`sub_gumbel`](sub_gumbel.py)
 
 ## Libraries
 - [JAX](https://github.com/google/jax)
