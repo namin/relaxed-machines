@@ -24,7 +24,7 @@ import notify
 
 NOTIFY = flags.DEFINE_boolean('notify', False, 'notify when training is complete (Mac OS X)')
 
-N = flags.DEFINE_integer('n', 4, 'number of integers')
+N = flags.DEFINE_integer('n', 5, 'number of integers')
 L = flags.DEFINE_integer('l', 10, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
@@ -33,7 +33,7 @@ LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 110000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
-TRAIN_DATA_WITH_SUB = flags.DEFINE_boolean('train_data_with_sub', True, 'train the data with the _SUB program as opposed to the vanilla one')
+TRAIN_DATA_WITH_SUB = flags.DEFINE_boolean('train_data_with_sub', False, 'train the data with the _SUB program as opposed to the vanilla one')
 HARD_SKETCH = flags.DEFINE_boolean('hard', False, 'whether to use a hard sketch: only parameters for holes')
 SOFT_SKETCH = flags.DEFINE_boolean('soft', False, 'whether to use a soft sketch: initial state, full parameters')
 SKETCH = flags.DEFINE_boolean('sketch', False, 'whether to sketch')
@@ -47,6 +47,7 @@ MASK_DATA = flags.DEFINE_boolean('mask_data', False, 'whether to mask the data s
 MASK_RET_P = flags.DEFINE_boolean('mask_ret_p', False, 'whether to mask the return stack pointer')
 MASK_RET = flags.DEFINE_boolean('mask_ret', False, 'whether to mask the return stack buffer')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
+CHECK_SIDE_BY_SIDE = flags.DEFINE_boolean('check_side_by_side', True, 'whether to check state side-by-side after training')
 
 INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
@@ -438,16 +439,17 @@ class MachineState:
         return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def check_similar_discrete(self, state1, state2):
-        (reg_a1, reg_b1, pc1, halted1, data_p1, data1, ret_p1, ret1) = self.discrete(state1)
-        (reg_a2, reg_b2, pc2, halted2, data_p2, data2, ret_p2, ret2) = self.discrete(state2)
-        assert reg_a1 == reg_a2
-        assert reg_b1 == reg_b2
-        assert pc1 == pc2
-        assert halted1 == halted2
-        assert data_p1 == data_p2
-        assert data1 == data2
-        assert ret_p1 == ret_p2
-        assert ret1 == ret2
+        if CHECK_SIDE_BY_SIDE.value:
+            (reg_a1, reg_b1, pc1, halted1, data_p1, data1, ret_p1, ret1) = self.discrete(state1)
+            (reg_a2, reg_b2, pc2, halted2, data_p2, data2, ret_p2, ret2) = self.discrete(state2)
+            assert reg_a1 == reg_a2
+            assert reg_b1 == reg_b2
+            assert pc1 == pc2
+            assert halted1 == halted2
+            assert data_p1 == data_p2
+            assert data1 == data2
+            assert ret_p1 == ret_p2
+            assert ret1 == ret2
 
     def print(self, state):
         (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.discrete(state)
