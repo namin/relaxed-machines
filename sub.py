@@ -24,13 +24,16 @@ import cache
 
 import notify
 
+PRNGKey = jnp.ndarray
+
 NOTIFY = flags.DEFINE_boolean('notify', False, 'notify when training is complete (Mac OS X)')
 
 N = flags.DEFINE_integer('n', 5, 'number of integers')
 L = flags.DEFINE_integer('l', 10, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
-SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 20, 'the multiplier to sharpen softmax')
+SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 20, 'the multiplier to sharpen softmax (inverse temperature)')
+GUMBEL_SOFTMAX = flags.DEFINE_boolean('gumbel_softmax', False, 'use Gumbel Softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 110000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
@@ -255,7 +258,10 @@ class InstructionSet:
         return next_state
 
     def sm(self, x):
-        return jax.nn.softmax(SOFTMAX_SHARP.value*x)
+        g = 0
+        if GUMBEL_SOFTMAX.value:
+            g = jax.random.gumbel(hk.next_rng_key(), x.shape)
+        return jax.nn.softmax(SOFTMAX_SHARP.value*(x+g))
 
     def empty_sketch(self):
         return ['HOLE' for i in range(self.l)]
@@ -554,7 +560,10 @@ def mask_each(xs):
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = mask_each(forward(t['input']))
-  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*states)
+  g = 0
+  if GUMBEL_SOFTMAX.value:
+      g = jax.random.gumbel(hk.next_rng_key(), states.shape)
+  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*(states+g))
   one_hot_labels = mask_each(t['target'])
   if FINAL.value:
       one_hot_labels = one_hot_labels[-1]
@@ -563,11 +572,11 @@ def sequence_loss(t) -> jnp.ndarray:
   return loss
 
 @jax.jit
-def update(state: TrainingState, t) -> TrainingState:
+def update(state: TrainingState, rng_key: PRNGKey, t) -> TrainingState:
   """Does a step of SGD given inputs & targets."""
   _, optimizer = make_optimizer()
-  _, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
-  gradients = jax.grad(loss_fn)(state.params, t)
+  _, loss_fn = hk.transform(sequence_loss)
+  gradients = jax.grad(loss_fn)(state.params, rng_key, t)
   updates, new_opt_state = optimizer(gradients, state.opt_state)
   new_params = optax.apply_updates(state.params, updates)
   return TrainingState(params=new_params, opt_state=new_opt_state)
@@ -633,7 +642,7 @@ def main(_):
         s = next(train_data)
         return s
 
-    params_init, loss_fn = hk.without_apply_rng(hk.transform(sequence_loss))
+    params_init, loss_fn = hk.transform(sequence_loss)
     opt_init, _ = make_optimizer()
 
     loss_fn = jax.jit(loss_fn)
@@ -644,7 +653,7 @@ def main(_):
 
     for step in tqdm(range(TRAINING_STEPS.value + 1)):
         t = some_train_data(next(rng))
-        state = update(state, t)
+        state = update(state, next(rng), t)
 
     if NOTIFY.value:
         notify.done()
@@ -669,7 +678,7 @@ def main(_):
     header()
     id = DiscreteInstructionSet(N.value, L.value, MachineState(N.value, L.value))
     idcode = id.program_to_one_hot(learnt_program)
-    _, forward_fn = hk.without_apply_rng(hk.transform(forward))
+    _, forward_fn = hk.transform(forward)
     for i in range(M.value):
         t = some_train_data(next(rng))
         inp = t['input']
@@ -679,7 +688,7 @@ def main(_):
         b = to_discrete_item(reg_b)
         print('A:', a, ', B:', b)
         idstate = id.s.initial(reg_a, reg_b)
-        states = forward_fn(state.params, inp)
+        states = forward_fn(state.params, next(rng), inp)
         halted = False
         for j, st in enumerate(states):
             idstate = id.step(idcode, idstate)
