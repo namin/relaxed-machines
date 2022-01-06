@@ -20,6 +20,8 @@ import itertools
 
 from tqdm import tqdm
 
+import cache
+
 import notify
 
 PRNGKey = jnp.ndarray
@@ -108,6 +110,9 @@ ADD_BY_INC_SKETCH_NO_JMP = [
     'HOLE', 'HOLE',#'JMP', 0,
     'STOP'
 ]
+
+def pick_program_suffix():
+    return '_sub' if TRAIN_DATA_WITH_SUB.value else ''
 
 def pick_ADD_BY_INC():
     return ADD_BY_INC_SUB if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC
@@ -589,9 +594,10 @@ def check_add_by_inc(i, inp, fin):
     assert d_a == 0
     assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
 
-def train_data_add_by_inc():
-    n = N.value
-    l = L.value
+def train_data_add_by_inc(n, l, s):
+    #n = N.value
+    #l = L.value
+    #s = S.value
     program = pick_ADD_BY_INC()
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
@@ -606,7 +612,7 @@ def train_data_add_by_inc():
             state = i.s.initial(reg_a, reg_b)
             #i.s.print(state)
             target = []
-            for k in range(S.value):
+            for k in range(s):
                 state = i.step(code, state)
                 #i.s.print(state)
                 target.append(state)
@@ -626,10 +632,8 @@ def main(_):
 
     rng = hk.PRNGSequence(SEED.value)
 
-    print('generating training data...')
-    train_data = train_data_add_by_inc()
+    train_data = cache.get_or_generate_data('data/inc'+pick_program_suffix()+'_%d_%d_%d.pickle', train_data_add_by_inc, N.value, L.value, S.value)
     n_train_data = len(train_data)
-    print('...done!')
 
     train_data = itertools.cycle(train_data)
     # I tried shuffling the order but it made learning worse.
