@@ -553,7 +553,7 @@ def sequence_loss(t) -> jnp.ndarray:
   diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
   diffs_masked = jax.tree_multimap(lambda x,y: x*y, diffs, mask())
   es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
-  n_items = len(t['target'][-1])
+  n_items = len(t['target'])
   loss = -jnp.sum(es) / (N.value * n_items)
   return loss
 
