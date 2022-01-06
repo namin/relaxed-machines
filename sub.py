@@ -165,10 +165,11 @@ class InstructionSet:
         next_buffer_p = jnp.matmul(buffer_p, self.dec_matrix(buffer_size))
         return (next_buffer_p, next_buffer, buffer_value)
 
-    def execute_instr(self, code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret):
+    def execute_instr(self, code, i, state):
+        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = state
         instr = self.get_instruction_name(i)
         if instr == 'STOP':
-            return (reg_a, reg_b, pc, data_p, data, ret_p, ret)
+            return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
         next_pc = jnp.matmul(pc, self.inc_matrix(self.l))
         if instr.startswith('PUSH'):
             assert instr == 'PUSH_A' or instr == 'PUSH_B'
@@ -220,42 +221,24 @@ class InstructionSet:
             next_pc = (1-p)*non_zero_next + p*zero_jmp
         else:
             assert instr == 'NOP', f"Unhandled instruction {instr}"
-        return (reg_a, reg_b, next_pc, data_p, data, ret_p, ret)
+        return (reg_a, reg_b, next_pc, halted, data_p, data, ret_p, ret)
 
     def step(self, code, state):
-        # TODO: unwieldly...
-        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.s.unpack(state, self.sm)
+        state = jax.tree_map(self.sm, state)
+        pc = self.s.pc(state)
+        halted = self.s.halted(state)
         sel = jnp.zeros(self.ni)
         for i in range(self.l):
             sel += pc[i] * self.sm(code[i])
-        new_reg_a = jnp.zeros(self.n)
-        new_reg_b = jnp.zeros(self.n)
-        new_pc = jnp.zeros(self.l)
-        new_data_p = jnp.zeros(self.n)
-        new_data = jnp.zeros([self.n, self.n])
-        new_ret_p = jnp.zeros(self.l)
-        new_ret = jnp.zeros([self.l, self.l])
+        new_state = jax.tree_map(lambda x: jnp.zeros(x.shape), state)
         for i in range(self.ni):
-            (delta_reg_a, delta_reg_b, delta_pc, delta_data_p, delta_data, delta_ret_p, delta_ret) = self.execute_instr(code, i, reg_a, reg_b, pc, data_p, data, ret_p, ret)
-            new_reg_a += sel[i] * delta_reg_a
-            new_reg_b += sel[i] * delta_reg_b
-            new_pc += sel[i] * delta_pc
-            new_data_p += sel[i] * delta_data_p
-            new_data += sel[i] * delta_data
-            new_ret_p += sel[i] * delta_ret_p
-            new_ret += sel[i] * delta_ret
-        next_reg_a = halted[0] * reg_a + halted[1] * new_reg_a
-        next_reg_b = halted[0] * reg_b + halted[1] * new_reg_b
-        next_pc = halted[0] * pc + halted[1] * new_pc
-        next_data_p = halted[0] * data_p + halted[1] * new_data_p
-        next_data = halted[0] * data + halted[1] * new_data
-        next_ret_p = halted[0] * ret_p + halted[1] * new_ret_p
-        next_ret = halted[0] * ret + halted[1] * new_ret
+            delta_state = self.execute_instr(code, i, state)
+            new_state = jax.tree_multimap(lambda new,delta: new + sel[i] * delta, new_state, delta_state)
+        next_state = jax.tree_multimap(lambda old,new: halted[0] * old + halted[1] * new, state, new_state)
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        next_state = self.s.pack(next_reg_a, next_reg_b, next_pc, next_halted, next_data_p, next_data, next_ret_p, next_ret)
-        return next_state
+        return self.s.update_halted(next_state, next_halted)
 
     def sm(self, x):
         return logit_fn(jax.nn.softmax)(x)
@@ -354,14 +337,8 @@ class MachineState:
         halted = jnp.array([0.0, 1.0])
         (data_p, data) = self.new_stack(self.n)
         (ret_p, ret) = self.new_stack(self.l)
-        state = self.pack(reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
+        state = (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
         return state
-
-    def unpack(self, state, fn=lambda x: x):
-        return jax.tree_map(fn, state)
-
-    def pack(self, reg_a, reg_b, pc, halted, data_p, data, ret_p, ret):
-        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def reg_a(self, state):
         return state[0]
@@ -374,6 +351,11 @@ class MachineState:
 
     def halted(self, state):
         return state[3]
+
+    def update_halted(self, state, next_halted):
+        mod_state = list(state)
+        mod_state[3] = next_halted
+        return tuple(mod_state)
 
     def data_p(self, state):
         return state[4]
@@ -574,7 +556,7 @@ def check_add_by_inc(i, inp, fin):
     state = fin
     a = to_discrete_item(reg_a)
     b = to_discrete_item(reg_b)
-    (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = i.s.unpack(state)
+    (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = state
     d_a = to_discrete_item(res_a)
     d_b = to_discrete_item(res_b)
     d_halted = to_discrete_item(res_halted)
@@ -710,7 +692,7 @@ def debug(_):
     while not halted:
         state = i.step(code, state)
         i.s.print(state)
-        (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = i.s.unpack(state)
+        (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = state
         d_halted = to_discrete_item(res_halted)
         halted = d_halted==0
 
