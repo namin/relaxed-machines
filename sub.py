@@ -258,10 +258,7 @@ class InstructionSet:
         return next_state
 
     def sm(self, x):
-        g = 0
-        if GUMBEL_SOFTMAX.value:
-            g = jax.random.gumbel(hk.next_rng_key(), x.shape)
-        return jax.nn.softmax(SOFTMAX_SHARP.value*(x+g))
+        return logit_fn(jax.nn.softmax)(x)
 
     def empty_sketch(self):
         return ['HOLE' for i in range(self.l)]
@@ -546,10 +543,15 @@ def mask():
         jnp.zeros([l,l]) if MASK_RET.value else jnp.ones([l,l]),
     )
 
+def logit_fn(softmax=jax.nn.softmax):
+    def fn(x):
+        return softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0)))
+    return fn
+
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = forward(t['input'])
-  log_probs = jax.tree_map(lambda x: jax.nn.log_softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0))), states)
+  log_probs = jax.tree_map(logit_fn(jax.nn.log_softmax), states)
   diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
   diffs_masked = jax.tree_multimap(lambda x,y: x*y, diffs, mask())
   es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
