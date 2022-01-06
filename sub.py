@@ -345,15 +345,6 @@ class MachineState:
         new = jnp.outer(p, value)
         return buffer - old + new
 
-    def over_buffer(self, buffer, fn):
-        return jnp.array([fn(x) for x in buffer])
-
-    def to_buffer(self, line, buffer_size):
-        return jnp.reshape(line, [buffer_size, buffer_size])
-
-    def pack_buffer(self, buffer, buffer_size):
-        return jnp.reshape(buffer, buffer_size*buffer_size)
-
     def new_stack(self, buffer_size):
         p = jnp.zeros(buffer_size).at[0].set(1)
         buffer = jnp.zeros([buffer_size, buffer_size])
@@ -370,43 +361,35 @@ class MachineState:
         return state
 
     def unpack(self, state, fn=lambda x: x):
-        reg_a = fn(self.reg_a(state))
-        reg_b = fn(self.reg_b(state))
-        pc = fn(self.pc(state))
-        halted = fn(self.halted(state))
-        data_p = fn(self.data_p(state))
-        data = self.over_buffer(self.data(state), fn)
-        ret_p = fn(self.ret_p(state))
-        ret = self.over_buffer(self.ret(state), fn)
-        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
+        return jax.tree_map(fn, state)
 
     def pack(self, reg_a, reg_b, pc, halted, data_p, data, ret_p, ret):
-        #return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data, self.n), ret_p, self.pack_buffer(ret, self.l)))
         return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def reg_a(self, state):
-        return state[0]#state[0:self.n]
+        return state[0]
 
     def reg_b(self, state):
-        return state[1]#state[self.n:2*self.n]
+        return state[1]
 
     def pc(self, state):
-        return state[2]#state[2*self.n:2*self.n+self.l]
+        return state[2]
 
     def halted(self, state):
-        return state[3]#state[2*self.n+self.l:2*self.n+self.l+2]
+        return state[3]
 
     def data_p(self, state):
-        return state[4]#state[2*self.n+self.l+2:3*self.n+self.l+2]
+        return state[4]
 
     def data(self, state):
-        return state[5]#self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n], self.n)
+        return state[5]
 
     def ret_p(self, state):
-        return state[6]#state[3*self.n+self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n]
+        return state[6]
 
     def ret(self, state):
-        return state[7]#self.to_buffer(state[3*self.n+2*self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n+self.l*self.l], self.l)
+        return state[7]
+
     def discrete(self, state):
         reg_a = self.reg_a(state)
         reg_b = self.reg_b(state)
@@ -550,7 +533,7 @@ def sequence_loss(t) -> jnp.ndarray:
   log_probs = jax.tree_map(lambda x: jax.nn.log_softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0))), states)
   diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
   es, _ = jax.flatten_util.ravel_pytree(diffs)
-  loss = -jnp.sum(es) / N.value
+  loss = -jnp.sum(es) / (N.value * es.size)
   return loss
 
 @jax.jit
