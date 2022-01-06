@@ -363,7 +363,7 @@ class MachineState:
 
     def initial(self, reg_a, reg_b):
         pc = jnp.zeros([self.l]).at[0].set(1)
-        halted = jnp.array([0, 1])
+        halted = jnp.array([0.0, 1.0])
         (data_p, data) = self.new_stack(self.n)
         (ret_p, ret) = self.new_stack(self.l)
         state = self.pack(reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
@@ -381,53 +381,32 @@ class MachineState:
         return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def pack(self, reg_a, reg_b, pc, halted, data_p, data, ret_p, ret):
-        return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data, self.n), ret_p, self.pack_buffer(ret, self.l)))
+        #return jnp.concatenate((reg_a, reg_b, pc, halted, data_p, self.pack_buffer(data, self.n), ret_p, self.pack_buffer(ret, self.l)))
+        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
 
     def reg_a(self, state):
-        return state[0:self.n]
+        return state[0]#state[0:self.n]
 
     def reg_b(self, state):
-        return state[self.n:2*self.n]
+        return state[1]#state[self.n:2*self.n]
 
     def pc(self, state):
-        return state[2*self.n:2*self.n+self.l]
+        return state[2]#state[2*self.n:2*self.n+self.l]
 
     def halted(self, state):
-        return state[2*self.n+self.l:2*self.n+self.l+2]
+        return state[3]#state[2*self.n+self.l:2*self.n+self.l+2]
 
     def data_p(self, state):
-        return state[2*self.n+self.l+2:3*self.n+self.l+2]
+        return state[4]#state[2*self.n+self.l+2:3*self.n+self.l+2]
 
     def data(self, state):
-        return self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n], self.n)
+        return state[5]#self.to_buffer(state[3*self.n+self.l+2:3*self.n+self.l+2+self.n*self.n], self.n)
 
     def ret_p(self, state):
-        return state[3*self.n+self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n]
+        return state[6]#state[3*self.n+self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n]
 
     def ret(self, state):
-        return self.to_buffer(state[3*self.n+2*self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n+self.l*self.l], self.l)
-
-    def mask(self, state):
-        (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.unpack(state)
-        mask = []
-        if not MASK_A.value:
-            mask.append(reg_a)
-        if not MASK_B.value:
-            mask.append(reg_b)
-        if not MASK_PC.value:
-            mask.append(pc)
-        if not MASK_HALTED.value:
-            mask.append(halted)
-        if not MASK_DATA_P.value:
-            mask.append(data_p)
-        if not MASK_DATA.value:
-            mask.append(self.pack_buffer(data, self.n))
-        if not MASK_RET_P.value:
-            mask.append(ret_p)
-        if not MASK_RET.value:
-            mask.append(self.pack_buffer(ret, self.l))
-        return jnp.concatenate(mask)
-
+        return state[7]#self.to_buffer(state[3*self.n+2*self.l+2+self.n*self.n:3*self.n+2*self.l+2+self.n*self.n+self.l*self.l], self.l)
     def discrete(self, state):
         reg_a = self.reg_a(state)
         reg_b = self.reg_b(state)
@@ -534,6 +513,15 @@ class Machine(hk.RNNCore):
             return code
         return code_fun
 
+class DiscreteMachine:
+    def __init__(self, i: InstructionSet, code):
+        self.i = i
+        self.code = code
+
+    def __call__(self, inputs, prev_state):
+        new_state = self.i.step(self.code, prev_state)
+        return new_state, new_state
+
 class TrainingState(NamedTuple):
   params: hk.Params
   opt_state: optax.OptState
@@ -553,22 +541,16 @@ def forward(input) -> jnp.ndarray:
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(sequence_length) for i in range(sequence_length)], initial_state)
   return states
 
-def mask_each(xs):
-    i = MachineState(N.value, L.value)
-    return jnp.array([i.mask(x) for x in xs])
+def debug_tree(xs):
+    return jax.tree_map(lambda x: x.shape, xs)
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
-  states = mask_each(forward(t['input']))
-  g = 0
-  if GUMBEL_SOFTMAX.value:
-      g = jax.random.gumbel(hk.next_rng_key(), states.shape)
-  log_probs = jax.nn.log_softmax(SOFTMAX_SHARP.value*(states+g))
-  one_hot_labels = mask_each(t['target'])
-  if FINAL.value:
-      one_hot_labels = one_hot_labels[-1]
-      log_probs = log_probs[-1]
-  loss = -jnp.sum(one_hot_labels * log_probs) / N.value
+  states = forward(t['input'])
+  log_probs = jax.tree_map(lambda x: jax.nn.log_softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0))), states)
+  diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
+  es, _ = jax.flatten_util.ravel_pytree(diffs)
+  loss = -jnp.sum(es) / N.value
   return loss
 
 @jax.jit
@@ -601,6 +583,7 @@ def train_data_add_by_inc(n, l, s):
     program = pick_ADD_BY_INC()
     i = DiscreteInstructionSet(n, l, MachineState(n, l))
     code = i.program_to_one_hot(program)
+    m = DiscreteMachine(i, code)
     print('MACHINE CODE for training')
     print(i.discrete_code(code))
     r = []
@@ -609,15 +592,10 @@ def train_data_add_by_inc(n, l, s):
             print(f"A = {a}, B = {b}")
             reg_a = jax.nn.one_hot(a, n)
             reg_b = jax.nn.one_hot(b, n)
-            state = i.s.initial(reg_a, reg_b)
-            #i.s.print(state)
-            target = []
-            for k in range(s):
-                state = i.step(code, state)
-                #i.s.print(state)
-                target.append(state)
-            t = {'input':(reg_a, reg_b), 'target': jnp.array(target)}
-            check_add_by_inc(i, t['input'], t['target'][-1])
+            initial_state = i.s.initial(reg_a, reg_b)
+            states, _ = hk.dynamic_unroll(m, [jnp.zeros(s) for i in range(s)], initial_state)
+            t = {'input':(reg_a, reg_b), 'target': states}
+            check_add_by_inc(i, t['input'], [x[-1] for x in t['target']])
             r.append(t)
     return r
 
