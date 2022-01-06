@@ -395,21 +395,21 @@ class MachineState:
             (reg_a1, reg_b1, pc1, halted1, data_p1, data1, ret_p1, ret1) = self.discrete(state1)
             (reg_a2, reg_b2, pc2, halted2, data_p2, data2, ret_p2, ret2) = self.discrete(state2)
             if not MASK_A.value:
-                assert reg_a1 == reg_a2
+                assert reg_a1 == reg_a2, f"{reg_a1} should be == to {reg_a2}"
             if not MASK_B.value:
-                assert reg_b1 == reg_b2
+                assert reg_b1 == reg_b2, f"{reg_b1} should be == to {reg_b2}"
             if not MASK_PC.value:
-                assert pc1 == pc2
+                assert pc1 == pc2, f"{pc1} should be == to {pc2}"
             if not MASK_HALTED.value:
-                assert halted1 == halted2
+                assert halted1 == halted2, f"{halted1} should be == to {halted2}"
             if not MASK_DATA_P.value:
-                assert data_p1 == data_p2
+                assert data_p1 == data_p2, f"{data_p1} should be == to {data_p2}"
             if not MASK_DATA.value:
-                assert data1 == data2
+                assert data1 == data2, f"{data1} should be == to {data2}"
             if not MASK_RET_P.value:
-                assert ret_p1 == ret_p2
+                assert ret_p1 == ret_p2, f"{ret_p1} should be == to {ret_p2}"
             if not MASK_RET.value:
-                assert ret1 == ret2
+                assert ret1 == ret2, f"{ret1} should be == to {ret2}"
 
     def print(self, state):
         (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.discrete(state)
@@ -594,7 +594,7 @@ def to_discrete(a):
     return [to_discrete_item(x) for x in a]
 
 def main(_):
-    #flags.FLAGS([""])
+    flags.FLAGS([""])
 
     rng = hk.PRNGSequence(SEED.value)
 
@@ -645,6 +645,8 @@ def main(_):
     id = DiscreteInstructionSet(N.value, L.value, MachineState(N.value, L.value))
     idcode = id.program_to_one_hot(learnt_program)
     _, forward_fn = hk.transform(forward)
+    s = S.value
+    m = DiscreteMachine(id, idcode)
     for i in range(M.value):
         t = some_train_data(next(rng))
         inp = t['input']
@@ -655,9 +657,12 @@ def main(_):
         print('A:', a, ', B:', b)
         idstate = id.s.initial(reg_a, reg_b)
         states = forward_fn(state.params, next(rng), inp)
+        states_discrete, _ = hk.dynamic_unroll(m, [jnp.zeros(s) for i in range(s)], idstate)
+        t_states = per_state(states)
+        t_states_discrete = per_state(states_discrete)
+        two_states = map(lambda x,y: (x,y), t_states_discrete, t_states)
         halted = False
-        for j, st in enumerate(states):
-            idstate = id.step(idcode, idstate)
+        for j, (idstate, st) in enumerate(two_states):
             iset.s.check_similar_discrete(idstate, st)
             new_halted  = to_discrete_item(iset.s.halted(st)) == 0
             if not halted:
@@ -665,37 +670,17 @@ def main(_):
             else:
                 assert halted == new_halted
             halted = new_halted
-        check_add_by_inc(iset, inp, states[-1])
+        check_add_by_inc(iset, inp, t_states[-1])
+        check_add_by_inc(iset, inp, t_states_discrete[-1])
 
     header()
 
-def debug(_):
-    n = N.value
-    l = L.value
-    a = 1
-    b = 2
-    # this is actually true!
-    program = ['JMP0_A', 5, 'INC_B', 'DEC_A', 'RET', 'PUSH_A', 'STOP', 'CALL', 'INC_B']
-    # this one is an infinite loop discreetely, but worked continuously
-    program = ['JMP0_A', 3, 'INC_B', 'DEC_A', 'JMP', 3, 'STOP', 'INC_B', 'INC', 'PUSH_A']
-    i = DiscreteInstructionSet(n, l, MachineState(n, l))
-    code = i.program_to_one_hot(program)
-    print('MACHINE CODE')
-    dcode = i.discrete_code(code)
-    print(dcode)
-    print(i.enjolivate(dcode))
-    reg_a = jax.nn.one_hot(a, n)
-    reg_b = jax.nn.one_hot(b, n)
-    state = i.s.initial(reg_a, reg_b)
-    i.s.print(state)
-    halted = False
-    while not halted:
-        state = i.step(code, state)
-        i.s.print(state)
-        (res_a, res_b, res_pc, res_halted, res_data_p, res_data, res_ret_p, res_ret) = state
-        d_halted = to_discrete_item(res_halted)
-        halted = d_halted==0
+def per_state(t):
+    return tree_transpose(jax.tree_map(lambda x: [el for el in x], t))
+
+def tree_transpose(list_of_trees):
+    """Convert a list of trees of identical structure into a single tree of lists."""
+    return jax.tree_multimap(lambda *xs: list(xs), *list_of_trees)
 
 if __name__ == '__main__':
-    #app.run(debug)
     app.run(main)
