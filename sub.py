@@ -415,14 +415,22 @@ class MachineState:
         if CHECK_SIDE_BY_SIDE.value:
             (reg_a1, reg_b1, pc1, halted1, data_p1, data1, ret_p1, ret1) = self.discrete(state1)
             (reg_a2, reg_b2, pc2, halted2, data_p2, data2, ret_p2, ret2) = self.discrete(state2)
-            assert reg_a1 == reg_a2
-            assert reg_b1 == reg_b2
-            assert pc1 == pc2
-            assert halted1 == halted2
-            assert data_p1 == data_p2
-            assert data1 == data2
-            assert ret_p1 == ret_p2
-            assert ret1 == ret2
+            if not MASK_A.value:
+                assert reg_a1 == reg_a2
+            if not MASK_B.value:
+                assert reg_b1 == reg_b2
+            if not MASK_PC.value:
+                assert pc1 == pc2
+            if not MASK_HALTED.value:
+                assert halted1 == halted2
+            if not MASK_DATA_P.value:
+                assert data_p1 == data_p2
+            if not MASK_DATA.value:
+                assert data1 == data2
+            if not MASK_RET_P.value:
+                assert ret_p1 == ret_p2
+            if not MASK_RET.value:
+                assert ret1 == ret2
 
     def print(self, state):
         (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret) = self.discrete(state)
@@ -524,16 +532,29 @@ def forward(input) -> jnp.ndarray:
   states, _ = hk.dynamic_unroll(core, [jnp.zeros(sequence_length) for i in range(sequence_length)], initial_state)
   return states
 
-def debug_tree(xs):
-    return jax.tree_map(lambda x: x.shape, xs)
+def mask():
+    n = N.value
+    l = L.value
+    return (
+        jnp.zeros(n) if MASK_A.value else jnp.ones(n),
+        jnp.zeros(n) if MASK_B.value else jnp.ones(n),
+        jnp.zeros(l) if MASK_PC.value else jnp.ones(l),
+        jnp.zeros(2) if MASK_HALTED.value else jnp.ones(2),
+        jnp.zeros(n) if MASK_DATA_P.value else jnp.ones(n),
+        jnp.zeros([n,n]) if MASK_DATA.value else jnp.ones([n,n]),
+        jnp.zeros(l) if MASK_RET_P.value else jnp.ones(l),
+        jnp.zeros([l,l]) if MASK_RET.value else jnp.ones([l,l]),
+    )
 
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = forward(t['input'])
   log_probs = jax.tree_map(lambda x: jax.nn.log_softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0))), states)
   diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
-  es, _ = jax.flatten_util.ravel_pytree(diffs)
-  loss = -jnp.sum(es) / (N.value * es.size)
+  diffs_masked = jax.tree_multimap(lambda x,y: x*y, diffs, mask())
+  es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
+  n_items = len(t['target'][-1])
+  loss = -jnp.sum(es) / (N.value * n_items)
   return loss
 
 @jax.jit
