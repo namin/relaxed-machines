@@ -370,25 +370,7 @@ class MachineState:
         return state[7]
 
     def discrete(self, state):
-        reg_a = self.reg_a(state)
-        reg_b = self.reg_b(state)
-        pc = self.pc(state)
-        halted = self.halted(state)
-        data_p = self.data_p(state)
-        data = self.data(state)
-        ret_p = self.ret_p(state)
-        ret = self.ret(state)
-
-        reg_a = to_discrete_item(reg_a)
-        reg_b = to_discrete_item(reg_b)
-        pc = to_discrete_item(pc)
-        halted = to_discrete_item(halted)
-        data_p = to_discrete_item(data_p)
-        data = to_discrete(data)
-        ret_p = to_discrete_item(ret_p)
-        ret = to_discrete(ret)
-
-        return (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
+        return jax.tree_map(to_discrete_either, state)
 
     def check_similar_discrete(self, state1, state2):
         if CHECK_SIDE_BY_SIDE.value:
@@ -592,6 +574,12 @@ def to_discrete_item(x):
 
 def to_discrete(a):
     return [to_discrete_item(x) for x in a]
+
+def to_discrete_either(x):
+    if len(x.shape)==1:
+        return to_discrete_item(x)
+    else:
+        return to_discrete(x)
 
 def main(_):
     flags.FLAGS([""])
