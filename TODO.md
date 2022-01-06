@@ -1,7 +1,6 @@
 Next steps (TODOs)
 ----------
 
-- [ ] Learn whether pytrees can improve the code (less repetition).
 - [ ] Implement sketches like ∂4.
 - [ ] Add batching.
 - [ ] Debug order of training samples.
@@ -82,5 +81,8 @@ Next steps (TODOs)
 - [x] Optionally use Gumbel-softmax instead of softmax. Required giving up on convenient `hk.without_apply_rng`.
 
 - [x] Performance seems to be worse with the Gumbel-softmax option than without.
+
+- [ ] Used pytrees to improve the code (less repetition).
+      However, due to the difference in how `softmax` items are grouped, we get worse performance.
 
 - [ ] Try incorporating temperature (inverse sharpness of softmax) decreasing during training.
