@@ -52,7 +52,9 @@ MASK_DATA = flags.DEFINE_boolean('mask_data', False, 'whether to mask the data s
 MASK_RET_P = flags.DEFINE_boolean('mask_ret_p', False, 'whether to mask the return stack pointer')
 MASK_RET = flags.DEFINE_boolean('mask_ret', False, 'whether to mask the return stack buffer')
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
+REVEAL_FINAL = flags.DEFINE_boolean('reveal_final', False, 'whether to reveal final state')
 CHECK_SIDE_BY_SIDE = flags.DEFINE_boolean('check_side_by_side', True, 'whether to check state side-by-side after training')
+CHECK_END = flags.DEFINE_boolean('check_end', True, 'whether to check learn machine')
 
 TEMPERATURE = flags.DEFINE_boolean('temperature', False, 'whether to use temperature in softmax calculation')
 TEMPERATURE_INIT = flags.DEFINE_float('temperature_init', 8, 'initial temperature')
@@ -534,7 +536,14 @@ def sequence_loss(t) -> jnp.ndarray:
   diffs_masked = jax.tree_multimap(lambda x,y: x*y, diffs, mask())
   es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
   n_items = len(t['target'])
-  loss = -jnp.sum(es) / (S.value * n_items)
+  loss = 0
+  factor = 1
+  if REVEAL_FINAL.value or FINAL.value:
+      factor = 2 if (not FINAL.value) else 1
+      last_ones = jnp.array(jax.tree_map(lambda x: jnp.sum(x[-1]), diffs if REVEAL_FINAL.value else diffs_masked))
+      loss += -jnp.sum(last_ones) / (n_items * factor)
+  if not FINAL.value:
+      loss += -jnp.sum(es) / (S.value * n_items * factor)
   return loss
 
 @jax.jit
@@ -644,6 +653,10 @@ def main(_):
         print(iset.enjolivate(learnt_program))
 
     header()
+
+    if not CHECK_END.value:
+        return
+
     id = DiscreteInstructionSet(N.value, L.value, MachineState(N.value, L.value))
     idcode = id.program_to_one_hot(learnt_program)
     _, forward_fn = hk.transform(forward)
