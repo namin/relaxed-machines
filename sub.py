@@ -54,6 +54,9 @@ MASK_RET = flags.DEFINE_boolean('mask_ret', False, 'whether to mask the return s
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 CHECK_SIDE_BY_SIDE = flags.DEFINE_boolean('check_side_by_side', True, 'whether to check state side-by-side after training')
 
+TEMPERATURE = flags.DEFINE_boolean('temperature', False, 'whether to use temperature in softmax calculation')
+TEMPERATURE_INIT = flags.DEFINE_float('temperature_init', 8, 'initial temperature')
+
 INSTRUCTION_NAMES = ['PUSH_A', 'PUSH_B', 'POP_A', 'POP_B', 'INC', 'INC_A', 'INC_B', 'DEC', 'DEC_A', 'DEC_B', 'JMP0', 'JMP0_A', 'JMP0_B', 'JMP', 'CALL', 'RET', 'NOP', 'STOP']
 INSTRUCTION_MAP = dict([(instr, index) for index, instr in enumerate(INSTRUCTION_NAMES)])
 
@@ -136,6 +139,15 @@ class InstructionSet:
             self.ni = self.l # pad to be able to address each of the l lines of code
         self.index_NOP = self.instruction_map['NOP']
         self.index_STOP = self.instruction_map['STOP']
+        self.temperature = TEMPERATURE.value
+        if self.temperature:
+            self.n_steps = TRAINING_STEPS.value
+            self.temp_init = TEMPERATURE_INIT.value
+            #self.temp_fn = lambda step: 1+self.temp_init*(1-((step+1)/self.n_steps))
+            self.temp_c = 1
+            self.temp_a = self.temp_init - 1
+            self.temp_d = 1e-5
+            self.temp_fn = lambda step: self.temp_c + self.temp_a*jnp.exp(-self.temp_d*step/self.n_steps)
         assert self.is_instr('STOP', self.index_STOP)
 
     def inc_matrix(self, dim, shift=1):
@@ -224,12 +236,13 @@ class InstructionSet:
         return (reg_a, reg_b, next_pc, halted, data_p, data, ret_p, ret)
 
     def step(self, code, state):
-        state = jax.tree_map(self.sm, state)
+        (step, state) = state
+        state = jax.tree_map(self.sm(step), state)
         pc = self.s.pc(state)
         halted = self.s.halted(state)
         sel = jnp.zeros(self.ni)
         for i in range(self.l):
-            sel += pc[i] * self.sm(code[i])
+            sel += pc[i] * self.sm(step)(code[i])
         new_state = jax.tree_map(lambda x: jnp.zeros(x.shape), state)
         for i in range(self.ni):
             delta_state = self.execute_instr(code, i, state)
@@ -238,10 +251,11 @@ class InstructionSet:
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
-        return self.s.update_halted(next_state, next_halted)
+        return (step+1, self.s.update_halted(next_state, next_halted))
 
-    def sm(self, x):
-        return logit_fn(jax.nn.softmax)(x)
+    def sm(self, step):
+        temp = self.temp_fn(step) if self.temperature else 1
+        return logit_fn(jax.nn.softmax, temp)
 
     def empty_sketch(self):
         return ['HOLE' for i in range(self.l)]
@@ -308,8 +322,8 @@ class DiscreteInstructionSet(InstructionSet):
     def __init__(self, n, l, s):
         super().__init__(n, l, s)
 
-    def sm(self, x):
-        return x
+    def sm(self, step):
+        return lambda x: x
 
 class MachineState:
     def __init__(self, n, l):
@@ -338,7 +352,7 @@ class MachineState:
         (data_p, data) = self.new_stack(self.n)
         (ret_p, ret) = self.new_stack(self.l)
         state = (reg_a, reg_b, pc, halted, data_p, data, ret_p, ret)
-        return state
+        return (0, state)
 
     def reg_a(self, state):
         return state[0]
@@ -424,7 +438,7 @@ class Machine(hk.RNNCore):
 
     def __call__(self, inputs, prev_state):
         new_state = self.step(prev_state)
-        return new_state, new_state
+        return new_state[1], new_state
 
     def init_hard_sketch(self):
         self.hard_sketch_code = self.i.sketch_to_one_hot(self.hard_sketch)
@@ -472,7 +486,7 @@ class DiscreteMachine:
 
     def __call__(self, inputs, prev_state):
         new_state = self.i.step(self.code, prev_state)
-        return new_state, new_state
+        return new_state[1], new_state
 
 class TrainingState(NamedTuple):
   params: hk.Params
@@ -507,9 +521,9 @@ def mask():
         jnp.zeros([l,l]) if MASK_RET.value else jnp.ones([l,l]),
     )
 
-def logit_fn(softmax=jax.nn.softmax):
+def logit_fn(softmax=jax.nn.softmax, temp=1.0):
     def fn(x):
-        return softmax(SOFTMAX_SHARP.value*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0)))
+        return softmax(SOFTMAX_SHARP.value*(1.0/temp)*(x+(jax.random.gumbel(hk.next_rng_key(), x.shape) if GUMBEL_SOFTMAX.value else 0)))
     return fn
 
 def sequence_loss(t) -> jnp.ndarray:
