@@ -35,7 +35,7 @@ S = flags.DEFINE_integer('s', 30, 'number of steps when running the machine')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax (inverse temperature)')
 GUMBEL_SOFTMAX = flags.DEFINE_boolean('gumbel_softmax', False, 'use Gumbel Softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
-TRAINING_STEPS = flags.DEFINE_integer('training_steps', 140000, '')
+TRAINING_STEPS = flags.DEFINE_integer('training_steps', 30000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 TRAIN_DATA_WITH_SUB = flags.DEFINE_boolean('train_data_with_sub', False, 'train the data with the _SUB program as opposed to the vanilla one')
@@ -143,11 +143,11 @@ class InstructionSet:
         if self.temperature:
             self.n_steps = TRAINING_STEPS.value
             self.temp_init = TEMPERATURE_INIT.value
-            #self.temp_fn = lambda step: 1+self.temp_init*(1-((step+1)/self.n_steps))
+            self.temp_fn = lambda step: 1+(self.temp_init-1)*(1-((step+1)/self.n_steps))
             self.temp_c = 1
             self.temp_a = self.temp_init - 1
             self.temp_d = 1e-5
-            self.temp_fn = lambda step: self.temp_c + self.temp_a*jnp.exp(-self.temp_d*step/self.n_steps)
+            #self.temp_fn = lambda step: self.temp_c + self.temp_a*jnp.exp(-self.temp_d*step/self.n_steps)
         assert self.is_instr('STOP', self.index_STOP)
 
     def inc_matrix(self, dim, shift=1):
@@ -571,8 +571,8 @@ def train_data_add_by_inc(n, l, s):
     print('MACHINE CODE for training')
     print(i.discrete_code(code))
     r = []
-    for a in range(n):
-        for b in range(n):
+    for b in range(n):
+        for a in range(n):
             print(f"A = {a}, B = {b}")
             reg_a = jax.nn.one_hot(a, n)
             reg_b = jax.nn.one_hot(b, n)
