@@ -82,7 +82,7 @@ Next steps (TODOs)
 
 - [x] Performance seems to be worse with the Gumbel-softmax option than without.
 
-- [ ] Used pytrees to improve the code (less repetition).
+- [x] Used pytrees to improve the code (less repetition).
       However, due to the difference in how `softmax` items are grouped, we get worse performance.
 
 - [ ] Try incorporating temperature (inverse sharpness of softmax) decreasing during training.
