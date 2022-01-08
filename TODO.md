@@ -57,13 +57,6 @@ Next steps (TODOs)
     - [x] By itself, a hard sketch does not seem to help reduce training steps.
           However, masking is now possible!
 
-- [ ] Instead of
-      ```['JMP0_A', 6, 'INC_B', 'DEC_A', 'JMP', 0, 'STOP']```
-      the machine learns
-      ```['JMP0_A', 6, 'INC_B', 'DEC_A', 'JMP0_A', 1, 'STOP']```
-      which is correct, and even slightly more efficient (in terms of number of steps).
-      Weirdly, this happens when using a full mask vs the state, which shouldn't make a difference.
-
 - [ ] Unroll the number of steps according to the computation.
 
 ## [`sub`](sub.py)
