@@ -20,6 +20,8 @@ import optax
 
 import itertools
 
+from tqdm import tqdm
+
 N = flags.DEFINE_integer('n', 3, 'number of integers')
 L = flags.DEFINE_integer('l', 9, 'number of lines of code')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
@@ -442,7 +444,7 @@ def main(_):
     initial_opt_state = opt_init(initial_params)
     state = TrainingState(params=initial_params, opt_state=initial_opt_state)
 
-    for step in range(TRAINING_STEPS.value + 1):
+    for step in tqdm(range(TRAINING_STEPS.value + 1)):
         t = some_train_data(next(rng))
         state = update(state, t)
 
