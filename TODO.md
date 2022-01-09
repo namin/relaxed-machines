@@ -1,6 +1,7 @@
 Next steps (TODOs)
 ----------
 
+- [ ] Try a Transformer instead of the RNN.
 - [ ] Implement sketches like ∂4.
 - [ ] Add batching.
 - [ ] Debug order of training samples.
