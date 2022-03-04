@@ -2,6 +2,7 @@ Next steps (TODOs)
 ----------
 
 - [ ] Try a Transformer instead of the RNN.
+- [ ] Add noise to gradient descent as suggested by the [Neural Programmer](https://arxiv.org/abs/1511.04834).
 - [ ] Implement sketches like ∂4.
 - [ ] Implement optimizations such as symbolic execution of straight-line code (like ∂4, see section 3.4.1 of thesis). Note: I think this would only work for code in hard sketches. Would it help that much?
 - [ ] Add batching.
