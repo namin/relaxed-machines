@@ -11,6 +11,7 @@ Next steps (TODOs)
 - [ ] Explore the approach of [Neural Programmer-Interpreters](https://arxiv.org/abs/1511.06279). It seems exciting because
 > A trained NPI with fixed parameters and a learned library of programs, can act both as an interpreter and as a programmer. As an interpreter, it takes input in the form of a program embedding and input data and subsequently executes the program.  As a programmer, it uses samples drawn from a new task to generate a new program embedding that can be added to its library of programs.
 - [ ] Explore [TerpreT](https://arxiv.org/abs/1608.04428) ([code](https://github.com/51alg/TerpreT)).
+      Makes the language extensible by compiling to an intermediate representation, though this does not make the language as a whole learnable.
 
 ## Log
 
