@@ -3,13 +3,14 @@ Next steps (TODOs)
 
 - [ ] Try a Transformer instead of the RNN.
 - [ ] Add noise to gradient descent as suggested by the [Neural Programmer](https://arxiv.org/abs/1511.04834).
+      Note: this might already be done with temperature.
 - [ ] Implement sketches like ∂4.
 - [ ] Implement optimizations such as symbolic execution of straight-line code (like ∂4, see section 3.4.1 of thesis). Note: I think this would only work for code in hard sketches. Would it help that much?
 - [ ] Add batching.
 - [ ] Debug order of training samples.
 - [ ] Explore the approach of [Neural Programmer-Interpreters](https://arxiv.org/abs/1511.06279). It seems exciting because
 > A trained NPI with fixed parameters and a learned library of programs, can act both as an interpreter and as a programmer. As an interpreter, it takes input in the form of a program embedding and input data and subsequently executes the program.  As a programmer, it uses samples drawn from a new task to generate a new program embedding that can be added to its library of programs.
-
+- [ ] Explore [TerpreT](https://arxiv.org/abs/1608.04428) ((code)[https://github.com/51alg/TerpreT]).
 
 ## Log
 
