@@ -3,6 +3,7 @@ Next steps (TODOs)
 
 - [ ] Try a Transformer instead of the RNN.
 - [ ] Implement sketches like ∂4.
+- [ ] Implement optimizations such as symbolic execution of straight-line code (like ∂4, see section 3.4.1 of thesis).
 - [ ] Add batching.
 - [ ] Debug order of training samples.
 
