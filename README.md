@@ -3,7 +3,13 @@ Relaxed Machines
 
 Explorations in neuro-symbolic differentiable interpreters.
 
+## Inspired by ∂4
+
+Differential interpreters in which the weights of the machine can be interpreted as a program.
+I think this is different in spirit from ∂4, which corresponds to hard sketches here with holes that are whole neural networks.
+
 Baby steps (see the [log](TODO.md#log)):
+
 1. [`inc_stop`](inc_stop.py)
 2. [`dup_add`](dup_add.py)
 3. [`reg_jmp`](reg_jmp.py)
