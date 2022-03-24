@@ -25,4 +25,4 @@ Baby steps (see the [log](TODO.md#log)):
 
 ## Acks
 
-Many thanks to [Rob Zinkov](https://zinkov.com) for discussions, insights, and suggestions.
+Many thanks to [Matko Bošnjak](https://matko.info/) and [Rob Zinkov](https://zinkov.com) for discussions, insights, suggestions, and pointers.
