@@ -13,6 +13,8 @@ Next steps (TODOs)
 > A trained NPI with fixed parameters and a learned library of programs, can act both as an interpreter and as a programmer. As an interpreter, it takes input in the form of a program embedding and input data and subsequently executes the program.  As a programmer, it uses samples drawn from a new task to generate a new program embedding that can be added to its library of programs.
 - [ ] Explore [TerpreT](https://arxiv.org/abs/1608.04428) ([code](https://github.com/51alg/TerpreT)).
       Makes the language extensible by compiling to an intermediate representation, though this does not make it possible to learn a DSL itself, just DSL programs.
+- [ ] Explore wake / sleep to iterate between creating and using abstractions
+- [ ] Explore transfer learning
 
 ## Log
 
