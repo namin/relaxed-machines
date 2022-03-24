@@ -14,7 +14,7 @@ Next steps (TODOs)
 - [ ] Explore [TerpreT](https://arxiv.org/abs/1608.04428) ([code](https://github.com/51alg/TerpreT)).
       Makes the language extensible by compiling to an intermediate representation, though this does not make it possible to learn a DSL itself, just DSL programs.
 - [ ] Explore wake / sleep iterating between using and creating abstractions
-- [ ] Explore transfer learning inspired by [NeuralTerpreT](https://arxiv.org/abs/1611.02109)
+- [ ] Explore transfer learning inspired by [Neural TerpreT](https://arxiv.org/abs/1611.02109)
 
 ## Log
 
