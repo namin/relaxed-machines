@@ -39,6 +39,7 @@ TRAINING_STEPS = flags.DEFINE_integer('training_steps', 30000, '')
 SEED = flags.DEFINE_integer('seed', 42, '')
 
 TRAIN_DATA_WITH_SUB = flags.DEFINE_boolean('train_data_with_sub', False, 'train the data with the _SUB program as opposed to the vanilla one')
+TRAIN_DATA_WITH_BRANCH = flags.DEFINE_boolean('train_data_with_branch', False, 'train the data with the _BRANCH program as opposed to the vanilla one')
 HARD_SKETCH = flags.DEFINE_boolean('hard', False, 'whether to use a hard sketch: only parameters for holes')
 SOFT_SKETCH = flags.DEFINE_boolean('soft', False, 'whether to use a soft sketch: initial state, full parameters')
 SKETCH = flags.DEFINE_boolean('sketch', False, 'whether to sketch')
@@ -92,6 +93,33 @@ ADD_BY_INC_SUB_SKETCH_NO_JMP = [
     'RET'       # 9
 ]
 
+ADD_BRANCH = [
+    'JMP0_B', 8,
+    'JMP0_A', 8,
+    'INC_B',
+    'DEC_A',
+    'JMP', 2,
+    'STOP'
+]
+
+ADD_BRANCH_SKETCH = [
+    'JMP0_B', 8,
+    'JMP0_A', 8,
+    'HOLE', #'INC_B',
+    'HOLE', #'DEC_A',
+    'JMP', 2,
+    'STOP'
+]
+
+ADD_BRANCH_SKETCH_NO_JMP = [
+    'HOLE', 'HOLE', #'JMP0_B', 8,
+    'HOLE', 'HOLE', #'JMP0_A', 8,
+    'INC_B',
+    'DEC_A',
+    'HOLE', 'HOLE', #'JMP', 2,
+    'STOP'
+]
+
 ADD_BY_INC = [
     'JMP0_A', 6,
     'INC_B',
@@ -117,16 +145,16 @@ ADD_BY_INC_SKETCH_NO_JMP = [
 ]
 
 def pick_program_suffix():
-    return '_sub' if TRAIN_DATA_WITH_SUB.value else ''
+    return '_sub' if TRAIN_DATA_WITH_SUB.value else '_branch' if TRAIN_DATA_WITH_BRANCH.value else ''
 
 def pick_ADD_BY_INC():
-    return ADD_BY_INC_SUB if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC
+    return ADD_BY_INC_SUB if TRAIN_DATA_WITH_SUB.value else ADD_BRANCH if TRAIN_DATA_WITH_BRANCH.value else ADD_BY_INC
 
 def pick_ADD_BY_INC_SKETCH():
-    return ADD_BY_INC_SUB_SKETCH if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC_SKETCH
+    return ADD_BY_INC_SUB_SKETCH if TRAIN_DATA_WITH_SUB.value else ADD_BRANCH_SKETCH if TRAIN_DATA_WITH_BRANCH.value else ADD_BY_INC_SKETCH
 
 def pick_ADD_BY_INC_SKETCH_NO_JMP():
-    return ADD_BY_INC_SUB_SKETCH_NO_JMP if TRAIN_DATA_WITH_SUB.value else ADD_BY_INC_SKETCH_NO_JMP
+    return ADD_BY_INC_SUB_SKETCH_NO_JMP if TRAIN_DATA_WITH_SUB.value else ADD_BRANCH_SKETCH_NO_JMP if TRAIN_DATA_WITH_BRANCH.value else ADD_BY_INC_SKETCH_NO_JMP
 
 class InstructionSet:
     def __init__(self, n, l, s):
@@ -566,8 +594,9 @@ def check_add_by_inc(i, inp, fin):
     d_b = to_discrete_item(res_b)
     d_halted = to_discrete_item(res_halted)
     assert d_halted == 0 # means halted...
-    assert d_a == 0
-    assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
+    if not TRAIN_DATA_WITH_BRANCH.value:
+        assert d_a == 0
+        assert d_b == (a+b)%N.value, f'{d_b} vs ({a}+{b})%N'
 
 def train_data_add_by_inc(n, l, s):
     #n = N.value
