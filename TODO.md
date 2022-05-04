@@ -15,6 +15,7 @@ Next steps (TODOs)
       Makes the language extensible by compiling to an intermediate representation, though this does not make it possible to learn a DSL itself, just DSL programs.
 - [ ] Explore wake / sleep iterating between using and creating abstractions.
 - [ ] Explore transfer learning inspired by [Neural TerpreT](https://arxiv.org/abs/1611.02109).
+- [ ] Explore [execution-guided synthesis](https://openreview.net/forum?id=H1gfOiAqYm) to deal with control structures separately from core forms.
 
 ## Log
 
