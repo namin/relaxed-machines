@@ -276,8 +276,8 @@ class InstructionSet:
         new_state = jax.tree_map(lambda x: jnp.zeros(x.shape), state)
         for i in range(self.ni):
             delta_state = self.execute_instr(code, i, state)
-            new_state = jax.tree_multimap(lambda new,delta: new + sel[i] * delta, new_state, delta_state)
-        next_state = jax.tree_multimap(lambda old,new: halted[0] * old + halted[1] * new, state, new_state)
+            new_state = jax.tree_map(lambda new,delta: new + sel[i] * delta, new_state, delta_state)
+        next_state = jax.tree_map(lambda old,new: halted[0] * old + halted[1] * new, state, new_state)
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
@@ -560,8 +560,8 @@ def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = forward(t['input'])
   log_probs = jax.tree_map(logit_fn(jax.nn.log_softmax), states)
-  diffs = jax.tree_multimap(lambda x,y: x*y, log_probs, t['target'])
-  diffs_masked = jax.tree_multimap(lambda x,y: x*y, diffs, mask())
+  diffs = jax.tree_map(lambda x,y: x*y, log_probs, t['target'])
+  diffs_masked = jax.tree_map(lambda x,y: x*y, diffs, mask())
   es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
   n_items = len(t['target'])
   loss = 0
@@ -724,7 +724,7 @@ def per_state(t):
 
 def tree_transpose(list_of_trees):
     """Convert a list of trees of identical structure into a single tree of lists."""
-    return jax.tree_multimap(lambda *xs: list(xs), *list_of_trees)
+    return jax.tree_map(lambda *xs: list(xs), *list_of_trees)
 
 if __name__ == '__main__':
     app.run(main)
