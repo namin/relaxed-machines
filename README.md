@@ -1,7 +1,7 @@
 Relaxed Machines
 ----------------
 
-Explorations in neuro-symbolic differentiable interpreters.
+Program synthesis in neuro-symbolic differentiable interpreters.
 
 ## Inspired by ∂4
 
