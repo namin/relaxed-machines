@@ -55,7 +55,7 @@ MASK_RET = flags.DEFINE_boolean('mask_ret', False, 'whether to mask the return s
 FINAL = flags.DEFINE_boolean('final', False, 'whether to only learn on final (possibly masked) state')
 REVEAL_FINAL = flags.DEFINE_boolean('reveal_final', False, 'whether to reveal final state')
 CHECK_SIDE_BY_SIDE = flags.DEFINE_boolean('check_side_by_side', True, 'whether to check state side-by-side after training')
-CHECK_END = flags.DEFINE_boolean('check_end', True, 'whether to check learn machine')
+CHECK_END = flags.DEFINE_boolean('check_end', True, 'whether to check learned machine')
 
 TEMPERATURE = flags.DEFINE_boolean('temperature', False, 'whether to use temperature in softmax calculation')
 TEMPERATURE_INIT = flags.DEFINE_float('temperature_init', 8, 'initial temperature')
