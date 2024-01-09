@@ -15,6 +15,9 @@ Baby steps (see the [log](TODO.md#log)):
 3. [`reg_jmp`](reg_jmp.py)
 4. [`sub`](sub.py)
 
+- [Notes](NOTES.md)
+- [Run logs](LOG.md)
+
 ## Libraries
 - [JAX](https://github.com/google/jax)
 - [Haiku](https://github.com/deepmind/dm-haiku)
