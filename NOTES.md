@@ -15,6 +15,7 @@ The *HOLE*s are turned into parameters of the neural network (RNN).
 In a hard sketch, some of the lines of code have fixed instructions and others have holes.
 We can start with an empty sketch by putting a _HOLE_ for each line.
 In a soft sketch, a given line of code is still a _HOLE_ but initialized with a given value.
+An empty sketch is initialized to all *NOP*s.
 
 An instruction is represented by a 1-hot encoding of size _ni_, the number of instructions, which is padded to at least _l_ to be able to address each of the _l_ lines of code.
 
