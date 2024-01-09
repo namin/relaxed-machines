@@ -1,6 +1,7 @@
 # Notes on Relaxed Machines
 
-The earlier experiments (`inc_stop`, `dup_add`) use input/output examples, while the later ones (`reg_jmp`, `sub`) use execution traces.
+The first experiment (`inc_stop`) use input/output examples, while the later ones (`dup_add`, `reg_jmp`, `sub`) use execution traces.
+Execution traces started with `dup_add`, which only learns well when giving it the data top of stack and pointer at each step.
 
 Learning is easier when leaving the state dirty, see `pop` in `sub`.
 
