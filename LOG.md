@@ -12,6 +12,9 @@
 - `python sub.py --train_data_with_sub --sketch --hard`
 - `python sub.py --train_data_with_sub --sketch --soft`
 - `python sub.py --train_data_with_sub --sketch --soft --sketch_no_jmp --training_steps 100000`
+- `python sub.py --hard --sketch --mask_pc --mask_data_p --mask_data --mask_ret_p mask_ret`
+- `python sub.py --soft --sketch --mask_pc --mask_data_p --mask_data --mask_ret_p mask_ret`
+
 
 ## Failed
 
