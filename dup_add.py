@@ -32,6 +32,7 @@ A = flags.DEFINE_integer('a', 2, 'learn f(x)=(a*x+b)%n')
 B = flags.DEFINE_integer('b', 0, 'learn f(x)=(a*x+b)%n')
 M = flags.DEFINE_integer('m', 3, 'number of tests to evaluate after training')
 P = flags.DEFINE_integer('p', -1, 'push instruction for each constant from 0 to argument')
+SUBMASK = flags.DEFINE_boolean('submask', False, 'whether to mask all but the data stack')
 SOFTMAX_SHARP = flags.DEFINE_float('softmax_sharp', 10, 'the multiplier to sharpen softmax')
 LEARNING_RATE = flags.DEFINE_float('learning_rate', 1e-3, '')
 TRAINING_STEPS = flags.DEFINE_integer('training_steps', 100000, '')
@@ -200,14 +201,17 @@ class MachineState:
         return data
 
     def mask(self, state):
-        data_p = self.data_p(state)
-        data = self.data(state)
-        top = self.read_value(data_p, data)
-        r = jnp.zeros(self.n*2)
-        r = r.at[0:self.n].set(top)
-        r = r.at[self.n:self.n*2].set(data_p)
-        # Give up on on smaller state, and give out the whole state...
-        return state
+        if SUBMASK.value:
+            data_p = self.data_p(state)
+            data = self.data(state)
+            top = self.read_value(data_p, data)
+            r = jnp.zeros(self.n*2)
+            r = r.at[0:self.n].set(top)
+            r = r.at[self.n:self.n*2].set(data_p)
+            return r
+        else:
+            # Give up on on smaller state, and give out the whole state...
+            return state
 
     def print(self, state):
         data_p = self.data_p(state)

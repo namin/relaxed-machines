@@ -4,6 +4,7 @@
 
 - `python inc_stop.py`
 - `python dup_add.py`
+- `python dup_add.py --submask`
 - `python reg_jmp.py`
 - `python sub.py`
 - `python sub.py --sketch --hard --sketch_no_jmp`
