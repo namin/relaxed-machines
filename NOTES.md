@@ -21,11 +21,14 @@ An instruction is represented by a 1-hot encoding of size _ni_, the number of in
 
 ### What are the details of the RNN, including all the hyperparameters
 
-The machine has parameters:
+The machine has hyperparameters:
 - the number of integers _n_,
 - the number of lines of code _l_,
 - the machine state _s_,
-- the instruction set _i_,
+- the instruction set _i_, which itself has hyperparameters:
+  - an optional temperature
+  - an optional gumbel softmax action
+  - an `sm` function, which either computes a softmax action or a discrete identity action
 - the hard sketch,
 - the holes or parameters and number of holes,
 - the initial state (based on the values of the registers).
