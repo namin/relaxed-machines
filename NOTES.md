@@ -6,6 +6,16 @@
 
 ### How we represent programs and programs with holes
 
+A program has a fixed max number of lines of code, _l_.
+Each line of code represents an instruction or an address to a line, and can be a _HOLE_.
+The _HOLE_s are turned into parameters of the neural network (RNN).
+
+In a hard sketch, some of the lines of code have fixed instructions and others have holes.
+We can start with an empty sketch by putting a _HOLE_ for each line.
+In a soft sketch, a given line of code is still a _HOLE_ but initialized with a given value.
+
+An instruction is represented by a 1-hot encoding of size _ni_, the number of instructions, which is padded to at least _l_ to be able to address each of the _l_ lines of code.
+
 ### How we run it for synthesis
 
 ### How we train from data
