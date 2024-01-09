@@ -4,6 +4,8 @@
 
 ### ∂4 primer
 
+We take from ∂4 the relaxation of a machine.
+
 ### How we represent programs and programs with holes
 
 A program has a fixed max number of lines of code, _l_.
