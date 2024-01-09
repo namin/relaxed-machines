@@ -8,7 +8,7 @@
 
 A program has a fixed max number of lines of code, _l_.
 Each line of code represents an instruction or an address to a line, and can be a _HOLE_.
-The _HOLE_s are turned into parameters of the neural network (RNN).
+The *HOLE*s are turned into parameters of the neural network (RNN).
 
 In a hard sketch, some of the lines of code have fixed instructions and others have holes.
 We can start with an empty sketch by putting a _HOLE_ for each line.
