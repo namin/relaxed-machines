@@ -21,6 +21,17 @@ An instruction is represented by a 1-hot encoding of size _ni_, the number of in
 
 ### What are the details of the RNN, including all the hyperparameters
 
+The machine has parameters:
+- the number of integers _n_,
+- the number of lines of code _l_,
+- the machine state _s_,
+- the instruction set _i_,
+- the hard sketch,
+- the holes and number of holes,
+- the initial state (based on the values of the registers).
+
+A step of the machine is taken by the instruction set _i_ based on the code (a mixture of parameters and hard-coded values based on the hard sketch).
+
 ### How we train from data
 
 For the training data, we produce pairs of input / target, where input is the input state of the registers and target is all the intermediary states of a discrete machine as it executes the program.
