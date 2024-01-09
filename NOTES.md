@@ -27,7 +27,7 @@ The machine has parameters:
 - the machine state _s_,
 - the instruction set _i_,
 - the hard sketch,
-- the holes and number of holes,
+- the holes or parameters and number of holes,
 - the initial state (based on the values of the registers).
 
 A step of the machine is taken by the instruction set _i_ based on the code (a mixture of parameters and hard-coded values based on the hard sketch).
