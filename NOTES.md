@@ -1,5 +1,19 @@
 # Notes on Relaxed Machines
 
+## Methodology
+
+### ∂4 primer
+
+### How we represent programs and programs with holes
+
+### How we run it for synthesis
+
+### How we train from data
+
+### How we generate that data
+
+## Notes
+
 The first experiment (`inc_stop`) use input/output examples, while the later ones (`dup_add`, `reg_jmp`, `sub`) use execution traces.
 Execution traces started with `dup_add`, which only learns well when giving it the data top of stack and pointer at each step.
 
