@@ -18,11 +18,23 @@ In a soft sketch, a given line of code is still a _HOLE_ but initialized with a 
 
 An instruction is represented by a 1-hot encoding of size _ni_, the number of instructions, which is padded to at least _l_ to be able to address each of the _l_ lines of code.
 
-### How we run it for synthesis
+### What are the details of the RNN, including all the hyperparameters
 
 ### How we train from data
 
+For the training data, we produce pairs of input / target, where input is the input state of the registers and target is all the intermediary states of a discrete machine as it executes the program.
+
+This is a lot of hand-holding! We support masking each component of the state, and also revealing only the final value of the state.
+
 ### How we generate that data
+
+We use the discrete machine and run a given discrete program on an input to produce a target, which is all the intermediary states of the machine until it halts.
+
+### How we run for synthesis
+
+For synthesis, we cycle through the training data.
+For each input / target pair, we compute the loss, based on the masking options.
+The loss is based on sum of log probabilities.
 
 ## Notes
 
