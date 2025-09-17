@@ -267,17 +267,17 @@ class InstructionSet:
 
     def step(self, code, state):
         (step, state) = state
-        state = jax.tree_map(self.sm(step), state)
+        state = jax.tree.map(self.sm(step), state)
         pc = self.s.pc(state)
         halted = self.s.halted(state)
         sel = jnp.zeros(self.ni)
         for i in range(self.l):
             sel += pc[i] * self.sm(step)(code[i])
-        new_state = jax.tree_map(lambda x: jnp.zeros(x.shape), state)
+        new_state = jax.tree.map(lambda x: jnp.zeros(x.shape), state)
         for i in range(self.ni):
             delta_state = self.execute_instr(code, i, state)
-            new_state = jax.tree_map(lambda new,delta: new + sel[i] * delta, new_state, delta_state)
-        next_state = jax.tree_map(lambda old,new: halted[0] * old + halted[1] * new, state, new_state)
+            new_state = jax.tree.map(lambda new,delta: new + sel[i] * delta, new_state, delta_state)
+        next_state = jax.tree.map(lambda old,new: halted[0] * old + halted[1] * new, state, new_state)
         halting = sel[self.index_STOP]
         not_halting = 1-halting
         next_halted = jnp.array([halted[0] + halted[1]*halting, halted[1]*not_halting])
@@ -414,7 +414,7 @@ class MachineState:
         return state[7]
 
     def discrete(self, state):
-        return jax.tree_map(to_discrete_either, state)
+        return jax.tree.map(to_discrete_either, state)
 
     def check_similar_discrete(self, state1, state2):
         if CHECK_SIDE_BY_SIDE.value:
@@ -559,16 +559,16 @@ def logit_fn(softmax=jax.nn.softmax, temp=1.0):
 def sequence_loss(t) -> jnp.ndarray:
   """Unrolls the network over a sequence of inputs & targets, gets loss."""
   states = forward(t['input'])
-  log_probs = jax.tree_map(logit_fn(jax.nn.log_softmax), states)
-  diffs = jax.tree_map(lambda x,y: x*y, log_probs, t['target'])
-  diffs_masked = jax.tree_map(lambda x,y: x*y, diffs, mask())
+  log_probs = jax.tree.map(logit_fn(jax.nn.log_softmax), states)
+  diffs = jax.tree.map(lambda x,y: x*y, log_probs, t['target'])
+  diffs_masked = jax.tree.map(lambda x,y: x*y, diffs, mask())
   es, _ = jax.flatten_util.ravel_pytree(diffs_masked)
   n_items = len(t['target'])
   loss = 0
   factor = 1
   if REVEAL_FINAL.value or FINAL.value:
       factor = 2 if (not FINAL.value) else 1
-      last_ones = jnp.array(jax.tree_map(lambda x: jnp.sum(x[-1]), diffs if REVEAL_FINAL.value else diffs_masked))
+      last_ones = jnp.array(jax.tree.map(lambda x: jnp.sum(x[-1]), diffs if REVEAL_FINAL.value else diffs_masked))
       loss += -jnp.sum(last_ones) / (n_items * factor)
   if not FINAL.value:
       loss += -jnp.sum(es) / (S.value * n_items * factor)
@@ -720,11 +720,11 @@ def main(_):
     header()
 
 def per_state(t):
-    return tree_transpose(jax.tree_map(lambda x: [el for el in x], t))
+    return tree_transpose(jax.tree.map(lambda x: [el for el in x], t))
 
 def tree_transpose(list_of_trees):
     """Convert a list of trees of identical structure into a single tree of lists."""
-    return jax.tree_map(lambda *xs: list(xs), *list_of_trees)
+    return jax.tree.map(lambda *xs: list(xs), *list_of_trees)
 
 if __name__ == '__main__':
     app.run(main)
